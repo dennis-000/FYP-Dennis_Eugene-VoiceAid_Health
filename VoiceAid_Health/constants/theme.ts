@@ -1,53 +1,36 @@
 /**
- * Below are the colors that are used in the app. The colors are defined in the light and dark mode.
- * There are many other ways to style your app. For example, [Nativewind](https://www.nativewind.dev/), [Tamagui](https://tamagui.dev/), [unistyles](https://reactnativeunistyles.vercel.app), etc.
+ * ==========================================
+ * THEME CONSTANTS
+ * ==========================================
+ * Central source of truth for app styling.
+ * * MODES:
+ * 1. Light: Standard clinical cleanliness (Blues/Whites)
+ * 2. High Contrast: For visually impaired users (Yellow on Black)
  */
 
-import { Platform } from 'react-native';
+export type ThemeMode = 'light' | 'high-contrast';
 
-const tintColorLight = '#0a7ea4';
-const tintColorDark = '#fff';
-
-export const Colors = {
+export const THEMES = {
   light: {
-    text: '#11181C',
-    background: '#fff',
-    tint: tintColorLight,
-    icon: '#687076',
-    tabIconDefault: '#687076',
-    tabIconSelected: tintColorLight,
+    bg: '#F8FAFC',       // Very light blue-grey background
+    card: '#FFFFFF',     // Pure white cards
+    text: '#1E293B',     // Slate-900 for primary text
+    subText: '#64748B',  // Slate-500 for secondary text
+    primary: '#2563EB',  // Royal Blue
+    accent: '#3B82F6',   // Lighter Blue
+    border: '#E2E8F0',   // Light border
+    success: '#10B981',  // Emerald Green
+    danger: '#EF4444'    // Red
   },
-  dark: {
-    text: '#ECEDEE',
-    background: '#151718',
-    tint: tintColorDark,
-    icon: '#9BA1A6',
-    tabIconDefault: '#9BA1A6',
-    tabIconSelected: tintColorDark,
-  },
+  'high-contrast': {
+    bg: '#000000',       // Pure Black
+    card: '#1C1C1E',     // Dark Grey cards
+    text: '#FFFFFF',     // Pure White text
+    subText: '#D1D1D6',  // Light Grey text
+    primary: '#FFD700',  // Gold/Yellow (Best contrast on black)
+    accent: '#FFFFFF',   // White accent
+    border: '#FFFFFF',   // White borders
+    success: '#00FF00',  // Neon Green
+    danger: '#FF0000'    // Bright Red
+  }
 };
-
-export const Fonts = Platform.select({
-  ios: {
-    /** iOS `UIFontDescriptorSystemDesignDefault` */
-    sans: 'system-ui',
-    /** iOS `UIFontDescriptorSystemDesignSerif` */
-    serif: 'ui-serif',
-    /** iOS `UIFontDescriptorSystemDesignRounded` */
-    rounded: 'ui-rounded',
-    /** iOS `UIFontDescriptorSystemDesignMonospaced` */
-    mono: 'ui-monospace',
-  },
-  default: {
-    sans: 'normal',
-    serif: 'serif',
-    rounded: 'normal',
-    mono: 'monospace',
-  },
-  web: {
-    sans: "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
-    serif: "Georgia, 'Times New Roman', serif",
-    rounded: "'SF Pro Rounded', 'Hiragino Maru Gothic ProN', Meiryo, 'MS PGothic', sans-serif",
-    mono: "SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace",
-  },
-});
