@@ -15,7 +15,9 @@ import {
   Moon, 
   Type, 
   UserCog, 
-  Info 
+  Info,
+  ChevronRight,
+  ClipboardList
 } from 'lucide-react-native';
 import { AppContext } from './_layout';
 
@@ -50,9 +52,9 @@ export default function SettingsScreen() {
   const router = useRouter();
   const { colors, themeMode, toggleTheme } = useContext(AppContext);
   
-  // Local state for non-global settings (placeholders)
+  // Local state
   const [caregiverMode, setCaregiverMode] = useState(false);
-  const [largeText, setLargeText] = useState(true); // Default to true for accessibility focus
+  const [largeText, setLargeText] = useState(true); 
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]}>
@@ -67,12 +69,12 @@ export default function SettingsScreen() {
           {/* Theme Toggle */}
           <View style={styles.settingRow}>
             <View style={styles.rowLeft}>
-              <View style={[styles.iconBox, { backgroundColor: themeMode === 'light' ? '#FEF3C7' : '#333' }]}>
+              <View style={[styles.iconBox, { backgroundColor: themeMode === 'high-contrast' ? '#333' : '#FEF3C7' }]}>
                 {themeMode === 'high-contrast' ? (
-                    <Sun size={20} color="#FFD700" />
-                  ) : (
-                    <Moon size={20} color="#D97706" />
-                  )}
+                  <Sun size={20} color="#FFD700" />
+                ) : (
+                  <Moon size={20} color="#D97706" />
+                )}
               </View>
               <View>
                 <Text style={[styles.settingLabel, { color: colors.text }]}>High Contrast</Text>
@@ -89,7 +91,7 @@ export default function SettingsScreen() {
             />
           </View>
           
-          {/* Large Text Toggle (Visual Only for now) */}
+          {/* Large Text Toggle */}
           <View style={[styles.settingRow, { borderTopWidth: 1, borderTopColor: colors.border }]}>
              <View style={styles.rowLeft}>
               <View style={[styles.iconBox, { backgroundColor: '#DBEAFE' }]}>
@@ -111,15 +113,16 @@ export default function SettingsScreen() {
         {/* CAREGIVER CONTROLS */}
         <SectionTitle title="Caregiver Mode" color={colors.subText} />
         <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          
           <View style={styles.settingRow}>
             <View style={styles.rowLeft}>
                <View style={[styles.iconBox, { backgroundColor: '#D1FAE5' }]}>
                 <UserCog size={20} color="#059669" />
                </View>
                <View style={{ flex: 1, paddingRight: 10 }}>
-                <Text style={[styles.settingLabel, { color: colors.text }]}>Edit Medical Routines</Text>
+                <Text style={[styles.settingLabel, { color: colors.text }]}>Caregiver Access</Text>
                 <Text style={[styles.settingSub, { color: colors.subText }]}>
-                  Allow changes to daily tasks and medication schedules.
+                  Enable editing and logs.
                 </Text>
                </View>
             </View>
@@ -129,6 +132,23 @@ export default function SettingsScreen() {
               trackColor={{ false: '#767577', true: colors.success }}
             /> 
           </View>
+
+          {/* NEW: HISTORY BUTTON */}
+          {caregiverMode && (
+            <TouchableOpacity 
+              style={[styles.settingRow, { borderTopWidth: 1, borderTopColor: colors.border }]}
+              onPress={() => router.push("/history")}
+            >
+              <View style={styles.rowLeft}>
+                 <View style={[styles.iconBox, { backgroundColor: '#E0E7FF' }]}>
+                  <ClipboardList size={20} color={colors.primary} />
+                 </View>
+                 <Text style={[styles.settingLabel, { color: colors.text }]}>View Patient Logs</Text>
+              </View>
+              <ChevronRight size={20} color={colors.subText} />
+            </TouchableOpacity>
+          )}
+
         </View>
 
         {/* APP INFO */}

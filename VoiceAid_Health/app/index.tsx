@@ -8,18 +8,39 @@ import {
   SafeAreaView 
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Mic, Calendar, Settings, Activity, ArrowLeft } from 'lucide-react-native';
+import { Mic, Calendar, Settings, Activity, LayoutGrid } from 'lucide-react-native'; 
 import { AppContext } from './_layout'; 
-import BigButton from '../components/BigButton'; // <--- IMPORT ADDED HERE
+import BigButton from '../components/BigButton';
 
-/**
- * ==========================================
- * SHARED COMPONENTS 
- * ==========================================
- */
+// --- TRANSLATIONS CONFIGURATION ---
+const TRANSLATIONS = {
+  en: {
+    speakNow: "Speak Now",
+    phraseBoard: "Phrase Board",
+    dailyCare: "Daily Care",
+    settings: "Settings",
+    systemReady: "System Ready",
+    activeLang: "Active Language"
+  },
+  twi: {
+    speakNow: "Kasa Seesei",        // Speak Now
+    phraseBoard: "Kasa Mfonini",    // Phrase Pictures/Board
+    dailyCare: "Apɔmuden Noto",     // Health Routine
+    settings: "Nhyehyɛe",           // Settings
+    systemReady: "System Ayɛ Krado",// System Ready
+    activeLang: "Kasa A Wopɛ"       // Active Language
+  },
+  ga: {
+    speakNow: "Wiemɔ Amrɔ",         // Speak Now
+    phraseBoard: "Wiemɔ Board",     // Phrase Board (Loan word often used)
+    dailyCare: "Gbi Noto",          // Daily Plan
+    settings: "Sajkuu",             // Settings/Arrangement
+    systemReady: "System Ebe",      // System Ready
+    activeLang: "Wiemɔ"             // Language
+  }
+};
 
-
-// You can also move this Header to components/Header.tsx later!
+// Header Component
 const Header = ({ title }: { title: string }) => {
   const { colors } = useContext(AppContext);
   return (
@@ -29,23 +50,21 @@ const Header = ({ title }: { title: string }) => {
   );
 };
 
-/**
- * ==========================================
- * HOME SCREEN COMPONENT
- * ==========================================
- */
 export default function HomeScreen() {
   const router = useRouter();
   const { colors, language, setLanguage } = useContext(AppContext);
+
+  // Get active translation based on selected language (default to English)
+  const t = TRANSLATIONS[language as keyof typeof TRANSLATIONS] || TRANSLATIONS.en;
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]}>
       <Header title="VoiceAid Health" />
       
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        {/* Language Toggle (Placeholder for Auto-Detect) */}
+        {/* Language Toggle */}
         <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <Text style={[styles.cardTitle, { color: colors.text }]}>Active Language</Text>
+          <Text style={[styles.cardTitle, { color: colors.text }]}>{t.activeLang}</Text>
           <View style={styles.langRow}>
             {['en', 'twi', 'ga'].map((lang) => (
               <TouchableOpacity 
@@ -69,28 +88,31 @@ export default function HomeScreen() {
               </TouchableOpacity>
             ))}
           </View>
-          <Text style={{ color: colors.subText, fontSize: 12, marginTop: 8 }}>
-            * Auto-detect is currently simulated
-          </Text>
         </View>
 
         {/* Main Action Grid */}
         <View style={styles.grid}>
-          {/* Now using the imported BigButton component */}
           <BigButton 
             icon={Mic} 
-            label="Speak Now" 
+            label={t.speakNow} 
             fullWidth 
             onPress={() => router.push('/transcript')} 
           />
+          
+          <BigButton 
+            icon={LayoutGrid} 
+            label={t.phraseBoard} 
+            onPress={() => router.push('/phraseboard')} 
+          />
+          
           <BigButton 
             icon={Calendar} 
-            label="Daily Care" 
+            label={t.dailyCare} 
             onPress={() => router.push('/routine')} 
           />
           <BigButton 
             icon={Settings} 
-            label="Settings" 
+            label={t.settings} 
             onPress={() => router.push('/settings')} 
           />
         </View>
@@ -100,7 +122,7 @@ export default function HomeScreen() {
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
             <Activity size={20} color={colors.success} />
             <Text style={[styles.cardTitle, { color: colors.text, marginLeft: 10, marginBottom: 0 }]}>
-              System Ready
+              {t.systemReady}
             </Text>
           </View>
           <Text style={{ color: colors.subText, marginTop: 5 }}>
