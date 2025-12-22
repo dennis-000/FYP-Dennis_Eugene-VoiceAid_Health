@@ -34,7 +34,6 @@ const Header = ({ title, onBack }: { title: string, onBack: () => void }) => {
   );
 };
 
-// --- DEFAULT EXPORT IS HERE ---
 export default function PhraseboardScreen() {
   const router = useRouter();
   const { colors, language } = useContext(AppContext);
@@ -58,19 +57,25 @@ export default function PhraseboardScreen() {
   };
 
   /**
+   * HELPERS
+   */
+  const getActiveText = (phrase: Phrase) => {
+    if (language === 'twi' && phrase.textTwi) return phrase.textTwi;
+    if (language === 'ga' && phrase.textGa) return phrase.textGa;
+    return phrase.text;
+  };
+
+  const getActiveLabel = (phrase: Phrase) => {
+    if (language === 'twi' && phrase.labelTwi) return phrase.labelTwi;
+    if (language === 'ga' && phrase.labelGa) return phrase.labelGa;
+    return phrase.label;
+  };
+
+  /**
    * PLAY AUDIO
-   * Selects the correct translation based on global language setting
    */
   const handlePhraseTap = (phrase: Phrase) => {
-    let textToSpeak = phrase.text; // Default English
-
-    if (language === 'twi' && phrase.textTwi) {
-      textToSpeak = phrase.textTwi;
-    } else if (language === 'ga' && phrase.textGa) {
-      textToSpeak = phrase.textGa;
-    }
-
-    // Call our Hybrid TTS Service
+    const textToSpeak = getActiveText(phrase);
     TTSService.speak(textToSpeak, language as any);
   };
 
@@ -147,6 +152,8 @@ export default function PhraseboardScreen() {
       <ScrollView contentContainerStyle={styles.grid}>
         {filteredPhrases.map(phrase => {
           const Icon = ICON_MAP[phrase.iconName] || ICON_MAP['custom'];
+          const displayLabel = getActiveLabel(phrase); // Get localized label
+
           return (
             <TouchableOpacity
               key={phrase.id}
@@ -166,8 +173,9 @@ export default function PhraseboardScreen() {
               <View style={[styles.iconCircle, { backgroundColor: phrase.color ? `${phrase.color}20` : `${colors.primary}20` }]}>
                 <Icon size={32} color={phrase.color || colors.primary} />
               </View>
+              
               <Text style={[styles.tileLabel, { color: colors.text }]} numberOfLines={2}>
-                {phrase.label}
+                {displayLabel}
               </Text>
               
               <View style={styles.ttsIcon}>

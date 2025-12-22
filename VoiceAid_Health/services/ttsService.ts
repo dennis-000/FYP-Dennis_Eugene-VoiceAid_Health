@@ -7,12 +7,11 @@ import { writeAsStringAsync, documentDirectory, EncodingType } from 'expo-file-s
  * TTS SERVICE (Hybrid: Native + API)
  * ==========================================
  * - English: Uses device native TTS (Fast, Offline)
- * - Twi/Ga:  Attempts Ghana NLP API; falls back to Native if no key is provided.
+ * - Twi/Ga:  Attempts Ghana NLP API; falls back to 'en-GH' (Ghanaian English) if API fails.
  */
 
 // ACCESS KEY FROM .ENV FILE
 const GHANA_NLP_API_KEY = process.env.EXPO_PUBLIC_GHANA_NLP_API_KEY; 
-// UPDATED URL based on your request
 const GHANA_NLP_URL = "https://translation-api.ghananlp.org/tts/v1/synthesize"; 
 
 const DEFAULT_OPTIONS = {
@@ -45,17 +44,19 @@ export const TTSService = {
     // Check if we actually have a key before trying the API
     if (!GHANA_NLP_API_KEY || GHANA_NLP_API_KEY.includes("YOUR_GHANA_NLP_KEY")) {
       console.log("[TTS] No Ghana NLP Key found. Using Native TTS fallback.");
-      const fallbackLocale = language === 'twi' ? 'ak-GH' : 'ga-GH'; 
-      Speech.speak(text, { ...DEFAULT_OPTIONS, language: fallbackLocale });
+      // Fallback to en-GH (Ghana English) which pronounces local words better than en-US
+      Speech.speak(text, { ...DEFAULT_OPTIONS, language: 'en-GH' });
       return;
     }
 
     try {
       console.log(`[TTS] Fetching Ghana NLP audio for ${language}: ${text}`);
       
-      // Configure body based on specific language requirements
       const langCode = language === 'twi' ? 'tw' : 'ga';
-      const speakerId = language === 'twi' ? 'twi_speaker_4' : 'ga_speaker_1'; // Defaulting Ga speaker
+      
+      // Note: 'ga_speaker_1' is a guess. If the API returns 500/400, it means this ID is wrong.
+      // If you find the correct Ga speaker ID from documentation, replace it here.
+      const speakerId = language === 'twi' ? 'twi_speaker_4' : 'ga_speaker_1'; 
 
       const response = await fetch(GHANA_NLP_URL, {
         method: 'POST',
@@ -72,7 +73,7 @@ export const TTSService = {
       });
 
       if (!response.ok) {
-        // Log the text error if possible for debugging
+        // If API fails (e.g. invalid speaker ID for Ga), throw error to trigger fallback
         const errorText = await response.text().catch(() => "Unknown error");
         throw new Error(`API Error ${response.status}: ${errorText}`);
       }
@@ -83,27 +84,36 @@ export const TTSService = {
       // Convert Blob to Base64 to save it
       const reader = new FileReader();
       reader.readAsDataURL(blob);
+      
+      // FIX: Async error handling inside the callback
       reader.onloadend = async () => {
-        const base64data = (reader.result as string).split(',')[1];
-        
-        // Save to a temporary file
-        const uri = `${documentDirectory}tts_temp.mp3`;
-        await writeAsStringAsync(uri, base64data, {
-          encoding: EncodingType.Base64,
-        });
+        try {
+          const base64data = (reader.result as string).split(',')[1];
+          
+          // Save to a temporary file
+          const uri = `${documentDirectory}tts_temp.mp3`;
+          await writeAsStringAsync(uri, base64data, {
+            encoding: EncodingType.Base64,
+          });
 
-        // Play the file
-        const { sound } = await Audio.Sound.createAsync({ uri });
-        currentSound = sound;
-        await sound.playAsync();
+          // Play the file
+          const { sound } = await Audio.Sound.createAsync({ uri });
+          currentSound = sound;
+          await sound.playAsync();
+        } catch (innerError) {
+          console.error("[TTS Playback Error - Falling back to Native]", innerError);
+          // FALLBACK 2: Playback failed
+          Speech.speak(text, { ...DEFAULT_OPTIONS, language: 'en-GH' });
+        }
       };
 
     } catch (error) {
-      console.error("[TTS Error]", error);
+      console.error("[TTS API Error - Falling back to Native]", error);
       
-      // FALLBACK: Use Native TTS if API fails (e.g., internet issues)
-      const fallbackLocale = language === 'twi' ? 'ak-GH' : 'ga-GH'; 
-      Speech.speak(text, { ...DEFAULT_OPTIONS, language: fallbackLocale });
+      // FALLBACK 1: API Request failed
+      // We use 'en-GH' (Ghanaian English) because it handles local names/words 
+      // much better than American English, preventing the "Spelling out" issue.
+      Speech.speak(text, { ...DEFAULT_OPTIONS, language: 'en-GH' });
     }
   },
 
