@@ -34,3 +34,22 @@ export const THEMES = {
     danger: '#FF0000'    // Bright Red
   }
 };
+
+export const Colors = {
+  light: {
+    text: THEMES.light.text,
+    background: THEMES.light.bg,
+    tint: THEMES.light.primary,
+    icon: '#687076',
+    tabIconDefault: '#687076',
+    tabIconSelected: THEMES.light.primary,
+  },
+  dark: {
+    text: THEMES['high-contrast'].text,
+    background: THEMES['high-contrast'].bg,
+    tint: THEMES['high-contrast'].primary,
+    icon: '#9BA1A6',
+    tabIconDefault: '#9BA1A6',
+    tabIconSelected: THEMES['high-contrast'].primary,
+  },
+};

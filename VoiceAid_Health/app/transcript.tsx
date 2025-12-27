@@ -1,25 +1,27 @@
-import React, { useState, useContext, useEffect } from 'react';
-import { 
-  StyleSheet, 
-  Text, 
-  View, 
-  TouchableOpacity, 
-  SafeAreaView,
-  ActivityIndicator,
-  Alert,
-  ScrollView
-} from 'react-native';
+import { Audio } from 'expo-av';
 import { useRouter } from 'expo-router';
-import { Audio } from 'expo-av'; 
-import { Mic, ArrowLeft, AlertCircle, Square, Languages, Volume2, Sparkles } from 'lucide-react-native';
+import { AlertCircle, ArrowLeft, Globe, Mic, Square } from 'lucide-react-native';
+import React, { useContext, useEffect, useState } from 'react';
+import {
+  Alert,
+  SafeAreaView,
+  ScrollView,
+  Text,
+  TouchableOpacity,
+  View
+} from 'react-native';
 import { AppContext } from './_layout';
 
-import { ASRService, ASRResponse } from '../services/asrService';
-import { IntentService, IntentResponse } from '../services/intentService';
-import { TTSService } from '../services/ttsService';
+import { ASRResponse, ASRService } from '../services/asr';
+import { HistoryService } from '../services/historyService';
+import { IntentResponse, IntentService } from '../services/intent';
+import { TTSService } from '../services/tts';
 
-import LiveWaveform from '../components/LiveWaveform'; 
-import ConfidenceMeter from '../components/ConfidenceMeter'; 
+import { IntentSuggestions } from '../components/IntentSuggestions';
+import { TranscriptionDisplay } from '../components/TranscriptionDisplay';
+import { useRole } from '../contexts/RoleContext';
+import { AudioPreprocessingService, ENHANCED_RECORDING_OPTIONS } from '../services/audioPreprocessingService';
+import { transcriptStyles as styles } from '../styles/transcript.styles';
 
 const Header = ({ title, onBack }: { title: string, onBack: () => void }) => {
   const { colors } = useContext(AppContext);
@@ -37,23 +39,48 @@ const Header = ({ title, onBack }: { title: string, onBack: () => void }) => {
 export default function TranscriptionScreen() {
   const router = useRouter();
   const { colors, language } = useContext(AppContext);
-  
+  const { role } = useRole();
+
   // State
   const [recording, setRecording] = useState<Audio.Recording | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [finalResult, setFinalResult] = useState<ASRResponse | null>(null);
-  
+
   // New Intent State (Object instead of string)
   const [intentData, setIntentData] = useState<IntentResponse | null>(null);
-  
-  const [meteringLevels, setMeteringLevels] = useState<number[]>([]); 
 
+  // Editing state
+  const [isEditing, setIsEditing] = useState(false);
+  const [editedText, setEditedText] = useState('');
+
+  // Audio quality state
+  const [meteringLevels, setMeteringLevels] = useState<number[]>([]);
+  const [audioQualityMetrics, setAudioQualityMetrics] = useState({
+    averageLevel: -160,
+    peakLevel: -160,
+    isTooQuiet: false,
+    isTooLoud: false,
+    hasConsistentInput: true,
+  });
+
+  // Request microphone permissions on mount
   useEffect(() => {
     (async () => {
       const { status } = await Audio.requestPermissionsAsync();
       if (status !== 'granted') Alert.alert('Permission needed', 'Microphone access is required.');
     })();
-    return () => { if (recording) recording.stopAndUnloadAsync(); };
+  }, []);
+
+  // Cleanup recording on unmount
+  useEffect(() => {
+    return () => {
+      if (recording) {
+        recording.stopAndUnloadAsync().catch(err => {
+          // Silently handle if already stopped
+          console.log('[Recording Cleanup] Already stopped:', err);
+        });
+      }
+    };
   }, [recording]);
 
   const startRecording = async () => {
@@ -62,19 +89,26 @@ export default function TranscriptionScreen() {
       setIntentData(null); // Clear previous suggestions
       setMeteringLevels([]);
 
-      await Audio.setAudioModeAsync({ allowsRecordingIOS: true, playsInSilentModeIOS: true });
+      // Use enhanced audio configuration
+      await AudioPreprocessingService.configureAudioSession();
+
       const { recording } = await Audio.Recording.createAsync(
-        Audio.RecordingOptionsPresets.HIGH_QUALITY,
+        ENHANCED_RECORDING_OPTIONS,
         (status) => {
           if (status.metering) {
             setMeteringLevels(prev => {
               const newLevels = [...prev, status.metering || -160];
-              if (newLevels.length > 20) newLevels.shift(); 
+              if (newLevels.length > 25) newLevels.shift();
+
+              // Update audio quality metrics in real-time
+              const quality = AudioPreprocessingService.analyzeAudioQuality(newLevels);
+              setAudioQualityMetrics(quality);
+
               return newLevels;
             });
           }
         },
-        100
+        100 // Update every 100ms for smooth visualization
       );
       setRecording(recording);
     } catch (err) {
@@ -88,12 +122,12 @@ export default function TranscriptionScreen() {
 
     try {
       await recording.stopAndUnloadAsync();
-      const uri = recording.getURI(); 
+      const uri = recording.getURI();
       setRecording(null);
-      
+
       if (uri) {
         setIsProcessing(true);
-        
+
         // 1. Get Text from Audio
         const result = await ASRService.processAudio(uri, language as any);
         setFinalResult(result);
@@ -102,7 +136,14 @@ export default function TranscriptionScreen() {
         // (Even if text is "water... need", AI will find intent)
         const prediction = await IntentService.predictIntent(result.text);
         setIntentData(prediction);
-        
+
+        // 3. Save to History
+        await HistoryService.addLog({
+          text: result.text,
+          intentCategory: prediction.category,
+          detectedLanguage: result.detectedLanguage
+        });
+
         setIsProcessing(false);
       }
     } catch (error) {
@@ -116,107 +157,86 @@ export default function TranscriptionScreen() {
     TTSService.speak(text, language as any);
   };
 
+  // Editing state - now handled in component, only need update handler
+  const handleUpdateResult = (text: string) => {
+    if (finalResult) {
+      setFinalResult(prev => prev ? ({ ...prev, text }) : null);
+    }
+  };
+
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]}>
       <Header title="Smart Transcribe" onBack={() => router.back()} />
-      
+
+      {/* Caregiver Helper Banner */}
+      {role === 'caregiver' && !recording && !finalResult && (
+        <View style={[styles.helperBanner, { backgroundColor: colors.primary + '15', borderColor: colors.primary }]}>
+          <AlertCircle size={20} color={colors.primary} />
+          <View style={{ flex: 1, marginLeft: 12 }}>
+            <Text style={[styles.helperTitle, { color: colors.primary }]}>
+              Assisted Communication Mode
+            </Text>
+            <Text style={[styles.helperText, { color: colors.text }]}>
+              • Record patient speech • Edit text • Play aloud for medical team
+            </Text>
+          </View>
+        </View>
+      )}
+
       <ScrollView contentContainerStyle={styles.centerContent}>
-        
+
         {/* Language Badge */}
         <View style={[styles.langBadge, { borderColor: colors.primary }]}>
-          <Languages size={14} color={colors.primary} style={{ marginRight: 6 }}/>
+          <Globe size={16} color={colors.primary} style={{ marginRight: 6 }} />
           <Text style={{ color: colors.primary, fontWeight: 'bold', textTransform: 'uppercase' }}>
-             {language === 'auto' ? 'Auto-Detect' : language}
+            {finalResult?.detectedLanguage && finalResult.detectedLanguage !== 'auto'
+              ? `Detected: ${finalResult.detectedLanguage}`
+              : (language === 'auto' ? 'Auto-Detect' : language)}
           </Text>
         </View>
 
         {/* --- TRANSCRIPTION BOX --- */}
-        <View style={[styles.transcriptionBox, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          {recording && (
-            <View style={{ width: '100%', alignItems: 'center' }}>
-               <Text style={{ color: colors.primary, marginBottom: 10, fontWeight: 'bold' }}>Listening...</Text>
-               <LiveWaveform levels={meteringLevels} isListening={true} />
-            </View>
-          )}
-
-          {isProcessing && (
-            <View style={{ alignItems: 'center', justifyContent: 'center' }}>
-               <ActivityIndicator size="large" color={colors.primary} />
-               <Text style={{ color: colors.subText, marginTop: 15 }}>Analyzing with AI...</Text>
-            </View>
-          )}
-
-          {!recording && !isProcessing && (
-             <View style={{ width: '100%' }}>
-                {/* Refined Text (Better Grammar) */}
-                {intentData?.refinedText && intentData.refinedText !== finalResult?.text && (
-                  <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 5 }}>
-                    <Sparkles size={12} color={colors.primary} style={{ marginRight: 4 }} />
-                    <Text style={{ fontSize: 12, color: colors.primary, fontWeight: 'bold' }}>AI REFINED</Text>
-                  </View>
-                )}
-
-                <Text style={[styles.transcriptText, { color: colors.text }]}>
-                  {intentData?.refinedText || finalResult?.text || "Tap microphone to speak"}
-                </Text>
-                
-                {finalResult && finalResult.text !== "Error: Could not connect to OpenAI. Check API Key." && (
-                   <ConfidenceMeter score={finalResult.confidence} />
-                )}
-             </View>
-          )}
-        </View>
+        <TranscriptionDisplay
+          recording={recording}
+          isProcessing={isProcessing}
+          finalResult={finalResult}
+          intentData={intentData}
+          meteringLevels={meteringLevels}
+          audioQualityMetrics={audioQualityMetrics}
+          colors={colors}
+          language={language as string}
+          onUpdateResult={handleUpdateResult}
+          onUpdateIntent={setIntentData}
+        />
 
         {/* --- PREDICTIVE SUGGESTIONS (The New Feature) --- */}
         {intentData && !recording && !isProcessing && (
-          <View style={{ width: '100%', marginBottom: 30 }}>
-            
-            {/* Category Header */}
-            <View style={[styles.intentBadge, { backgroundColor: colors.primary }]}>
-              <AlertCircle size={14} color="#FFF" style={{ marginRight: 6 }} />
-              <Text style={styles.intentText}>Intent Detected: {intentData.category}</Text>
-            </View>
-
-            {/* Quick Phrase Chips */}
-            <Text style={{ color: colors.subText, marginBottom: 10, fontWeight: '600' }}>
-              Suggested Responses (Tap to Speak):
-            </Text>
-            
-            <View style={styles.chipContainer}>
-              {intentData.suggestions.map((suggestion, index) => (
-                <TouchableOpacity 
-                  key={index}
-                  style={[styles.chip, { backgroundColor: colors.card, borderColor: colors.primary }]}
-                  onPress={() => handleSpeakSuggestion(suggestion)}
-                >
-                  <Volume2 size={16} color={colors.primary} style={{ marginRight: 6 }} />
-                  <Text style={{ color: colors.text, fontWeight: '500' }}>{suggestion}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-
-          </View>
+          <IntentSuggestions
+            intentData={intentData}
+            onSuggestionPress={handleSpeakSuggestion}
+            colors={colors}
+          />
         )}
 
         {/* Mic Control */}
-        <TouchableOpacity 
+        <TouchableOpacity
           style={[
-            styles.micCircle, 
-            { 
+            styles.micCircle,
+            {
               backgroundColor: recording ? colors.danger : colors.primary,
-              shadowColor: colors.text 
+              shadowColor: colors.text
             }
           ]}
           onPress={recording ? stopAndTranscribe : startRecording}
           activeOpacity={0.7}
         >
           {recording ? (
-             <Square size={32} color="#FFF" fill="#FFF" />
+            <Square size={32} color="#FFF" fill="#FFF" />
           ) : (
-             <Mic size={40} color="#FFF" />
+            <Mic size={40} color="#FFF" />
           )}
         </TouchableOpacity>
-        
+
         <Text style={{ color: colors.subText, marginTop: 15, fontSize: 16, marginBottom: 40 }}>
           {recording ? "Tap to Process" : "Tap to Speak"}
         </Text>
@@ -226,90 +246,3 @@ export default function TranscriptionScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1 },
-  header: { 
-    padding: 20, 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    justifyContent: 'space-between', 
-    borderBottomWidth: 1 
-  },
-  headerTitle: { fontSize: 22, fontWeight: 'bold' },
-  backBtn: { padding: 5 },
-  centerContent: { 
-    flexGrow: 1, 
-    alignItems: 'center', 
-    padding: 20 
-  },
-  langBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-    borderWidth: 1,
-    marginBottom: 20
-  },
-  transcriptionBox: { 
-    width: '100%', 
-    minHeight: 180, 
-    padding: 24, 
-    borderRadius: 16, 
-    borderWidth: 1, 
-    marginBottom: 20, 
-    alignItems: 'center',
-    justifyContent: 'center', 
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3
-  },
-  transcriptText: { 
-    fontSize: 22, 
-    textAlign: 'center', 
-    lineHeight: 32,
-    fontWeight: '500',
-    marginBottom: 10
-  },
-  
-  // Intent & Suggestions
-  intentBadge: { 
-    alignSelf: 'flex-start',
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12, 
-    paddingVertical: 6, 
-    borderRadius: 12, 
-    marginBottom: 15 
-  },
-  intentText: { color: '#FFF', fontWeight: 'bold', fontSize: 12, textTransform: 'uppercase' },
-  chipContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-  },
-  chip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 24,
-    borderWidth: 1,
-    elevation: 1,
-  },
-
-  // Mic
-  micCircle: { 
-    width: 80, 
-    height: 80, 
-    borderRadius: 40, 
-    alignItems: 'center', 
-    justifyContent: 'center', 
-    elevation: 5,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4.65,
-  },
-});

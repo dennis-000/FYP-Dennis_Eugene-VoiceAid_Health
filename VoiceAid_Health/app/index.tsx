@@ -1,16 +1,16 @@
-import React, { useContext } from 'react';
-import { 
-  StyleSheet, 
-  Text, 
-  View, 
-  TouchableOpacity, 
-  ScrollView, 
-  SafeAreaView 
-} from 'react-native';
 import { useRouter } from 'expo-router';
-import { Mic, Calendar, Settings, Activity, LayoutGrid } from 'lucide-react-native'; 
-import { AppContext } from './_layout'; 
-import BigButton from '../components/BigButton';
+import React, { useContext, useEffect } from 'react';
+import {
+  SafeAreaView,
+  ScrollView,
+  Text,
+  View
+} from 'react-native';
+import { CaregiverDashboard } from '../components/ui/CaregiverDashboard';
+import { PatientDashboard } from '../components/ui/PatientDashboard';
+import { useRole } from '../contexts/RoleContext';
+import { homeStyles as styles } from '../styles/index.styles';
+import { AppContext } from './_layout';
 
 // --- TRANSLATIONS CONFIGURATION ---
 const TRANSLATIONS = {
@@ -53,105 +53,48 @@ const Header = ({ title }: { title: string }) => {
 export default function HomeScreen() {
   const router = useRouter();
   const { colors, language, setLanguage } = useContext(AppContext);
+  const { role, isFirstLaunch } = useRole();
+
+  // Redirect to welcome screen if no role is selected
+  useEffect(() => {
+    if (!role) {
+      router.replace('/welcome');
+    }
+  }, [role]);
 
   // Get active translation based on selected language (default to English)
   const t = TRANSLATIONS[language as keyof typeof TRANSLATIONS] || TRANSLATIONS.en;
 
+  // Show loading or nothing while checking role
+  if (!role) {
+    return null;
+  }
+
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]}>
-      <Header title="VoiceAid Health" />
-      
+      <Header title={role === 'patient' ? "VoiceAid Health" : "VoiceAid Health (Caregiver)"} />
+
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        {/* Language Toggle */}
-        <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <Text style={[styles.cardTitle, { color: colors.text }]}>{t.activeLang}</Text>
-          <View style={styles.langRow}>
-            {['en', 'twi', 'ga'].map((lang) => (
-              <TouchableOpacity 
-                key={lang}
-                onPress={() => setLanguage(lang as any)}
-                style={[
-                  styles.langBadge, 
-                  { 
-                    backgroundColor: language === lang ? colors.primary : 'transparent',
-                    borderColor: colors.primary
-                  }
-                ]}
-              >
-                <Text style={{ 
-                  color: language === lang ? '#FFF' : colors.text, 
-                  fontWeight: 'bold',
-                  textTransform: 'uppercase'
-                }}>
-                  {lang}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
 
-        {/* Main Action Grid */}
-        <View style={styles.grid}>
-          <BigButton 
-            icon={Mic} 
-            label={t.speakNow} 
-            fullWidth 
-            onPress={() => router.push('/transcript')} 
-          />
-          
-          <BigButton 
-            icon={LayoutGrid} 
-            label={t.phraseBoard} 
-            onPress={() => router.push('/phraseboard')} 
-          />
-          
-          <BigButton 
-            icon={Calendar} 
-            label={t.dailyCare} 
-            onPress={() => router.push('/routine')} 
-          />
-          <BigButton 
-            icon={Settings} 
-            label={t.settings} 
-            onPress={() => router.push('/settings')} 
-          />
-        </View>
+        {/* PATIENT MODE: Simple, Minimal Interface */}
+        {/* PATIENT MODE: Simple, Minimal Interface */}
+        {role === 'patient' && (
+          <PatientDashboard router={router} t={t} colors={colors} />
+        )}
 
-        {/* Status Card */}
-        <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border, marginTop: 20 }]}>
-          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <Activity size={20} color={colors.success} />
-            <Text style={[styles.cardTitle, { color: colors.text, marginLeft: 10, marginBottom: 0 }]}>
-              {t.systemReady}
-            </Text>
-          </View>
-          <Text style={{ color: colors.subText, marginTop: 5 }}>
-            Model: Phase 4 Twi/Ga Placeholder loaded.
-          </Text>
-        </View>
+        {/* CAREGIVER MODE: Full Management Interface */}
+        {role === 'caregiver' && (
+          <CaregiverDashboard
+            router={router}
+            t={t}
+            colors={colors}
+            language={language}
+            setLanguage={setLanguage}
+          />
+        )}
+
       </ScrollView>
     </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1 },
-  header: { 
-    padding: 20, 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    justifyContent: 'center', 
-    borderBottomWidth: 1 
-  },
-  headerTitle: { fontSize: 22, fontWeight: 'bold' },
-  scrollContent: { padding: 20 },
-  
-  // Grid
-  grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', gap: 10, marginTop: 20 },
-  
-  // Cards
-  card: { padding: 16, borderRadius: 12, borderWidth: 1 },
-  cardTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 10 },
-  langRow: { flexDirection: 'row', gap: 10 },
-  langBadge: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 8, borderWidth: 1 },
-});

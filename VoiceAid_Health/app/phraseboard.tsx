@@ -1,25 +1,27 @@
-import React, { useState, useContext, useEffect } from 'react';
-import { 
-  StyleSheet, 
-  Text, 
-  View, 
-  TouchableOpacity, 
-  ScrollView, 
-  SafeAreaView,
+import { useRouter } from 'expo-router';
+import { ArrowLeft, Plus, X } from 'lucide-react-native';
+import { useContext, useEffect, useState } from 'react';
+import {
+  Alert,
   Dimensions,
   Modal,
+  SafeAreaView,
+  ScrollView,
+  Text,
   TextInput,
-  Alert
+  TouchableOpacity,
+  View
 } from 'react-native';
-import { useRouter } from 'expo-router';
-import { ArrowLeft, Volume2, Plus, X } from 'lucide-react-native';
+import { CategoryTabs } from '../components/CategoryTabs';
+import { PhraseTile } from '../components/PhraseTile';
+import { CategoryId, Phrase, PhraseService } from '../services/phrase';
+import { TTSService } from '../services/tts';
+import { phraseboardStyles as styles } from '../styles/phraseboard.styles';
 import { AppContext } from './_layout';
-import { PhraseService, Phrase, PHRASE_CATEGORIES, ICON_MAP, CategoryId } from '../services/phraseService';
-import { TTSService } from '../services/ttsService';
 
 const { width } = Dimensions.get('window');
 // Feature: Larger buttons for motor-impaired users (approx 45% of screen width)
-const TILE_SIZE = (width - 60) / 2; 
+const TILE_SIZE = (width - 60) / 2;
 
 const Header = ({ title, onBack }: { title: string, onBack: () => void }) => {
   const { colors } = useContext(AppContext);
@@ -37,15 +39,27 @@ const Header = ({ title, onBack }: { title: string, onBack: () => void }) => {
 export default function PhraseboardScreen() {
   const router = useRouter();
   const { colors, language } = useContext(AppContext);
-  
-  // State
+
+  //State
   const [phrases, setPhrases] = useState<Phrase[]>([]);
   const [activeCategory, setActiveCategory] = useState<CategoryId>('needs');
   const [isModalVisible, setIsModalVisible] = useState(false);
-  
-  // Form State
+  const [editingId, setEditingId] = useState<string | null>(null);
+
+  // Form State - English
   const [newLabel, setNewLabel] = useState('');
   const [newText, setNewText] = useState('');
+
+  // Form State - Twi
+  const [newLabelTwi, setNewLabelTwi] = useState('');
+  const [newTextTwi, setNewTextTwi] = useState('');
+
+  // Form State - Ga
+  const [newLabelGa, setNewLabelGa] = useState('');
+  const [newTextGa, setNewTextGa] = useState('');
+
+  // Icon selection
+  const [selectedIcon, setSelectedIcon] = useState('custom');
 
   useEffect(() => {
     loadPhrases();
@@ -79,19 +93,17 @@ export default function PhraseboardScreen() {
     TTSService.speak(textToSpeak, language as any);
   };
 
-  const handleLongPress = (phrase: Phrase) => {
-    if (!phrase.isCustom) return; // Only delete custom phrases
-
+  const handleDelete = (phraseId: string) => {
     Alert.alert(
       "Delete Phrase",
-      "Do you want to remove this custom phrase?",
+      "Are you sure you want to delete this phrase?",
       [
         { text: "Cancel", style: "cancel" },
-        { 
-          text: "Delete", 
-          style: "destructive", 
+        {
+          text: "Delete",
+          style: "destructive",
           onPress: async () => {
-            const updated = await PhraseService.deletePhrase(phrase.id);
+            const updated = await PhraseService.deletePhrase(phraseId);
             setPhrases(updated);
           }
         }
@@ -99,21 +111,61 @@ export default function PhraseboardScreen() {
     );
   };
 
+  const openEditModal = (phrase: Phrase) => {
+    setEditingId(phrase.id);
+    setNewLabel(phrase.label);
+    setNewText(phrase.text);
+    setNewLabelTwi(phrase.labelTwi || '');
+    setNewTextTwi(phrase.textTwi || '');
+    setNewLabelGa(phrase.labelGa || '');
+    setNewTextGa(phrase.textGa || '');
+    setSelectedIcon(phrase.iconName || 'custom');
+    setIsModalVisible(true);
+  };
+
+  const resetForm = () => {
+    setEditingId(null);
+    setNewLabel('');
+    setNewText('');
+    setNewLabelTwi('');
+    setNewTextTwi('');
+    setNewLabelGa('');
+    setNewTextGa('');
+    setSelectedIcon('custom');
+  };
+
   const handleAddPhrase = async () => {
     if (!newLabel.trim() || !newText.trim()) return;
 
-    const updated = await PhraseService.addPhrase({
-      category: activeCategory,
-      label: newLabel,
-      text: newText,
-      // Note: Custom phrases currently default to English text. 
-      // Future enhancement: Add inputs for Twi/Ga translations in this modal.
-    });
-    
-    setPhrases(updated);
+    if (editingId) {
+      // Update existing phrase
+      const updated = await PhraseService.updatePhrase(editingId, {
+        label: newLabel,
+        text: newText,
+        labelTwi: newLabelTwi || undefined,
+        textTwi: newTextTwi || undefined,
+        labelGa: newLabelGa || undefined,
+        textGa: newTextGa || undefined,
+        iconName: selectedIcon,
+      });
+      setPhrases(updated);
+    } else {
+      // Add new phrase
+      const updated = await PhraseService.addPhrase({
+        category: activeCategory,
+        label: newLabel,
+        text: newText,
+        labelTwi: newLabelTwi || undefined,
+        textTwi: newTextTwi || undefined,
+        labelGa: newLabelGa || undefined,
+        textGa: newTextGa || undefined,
+        iconName: selectedIcon,
+      });
+      setPhrases(updated);
+    }
+
     setIsModalVisible(false);
-    setNewLabel('');
-    setNewText('');
+    resetForm();
   };
 
   const filteredPhrases = phrases.filter(p => p.category === activeCategory);
@@ -121,67 +173,28 @@ export default function PhraseboardScreen() {
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]}>
       <Header title="Phraseboard" onBack={() => router.back()} />
-      
+
       {/* Category Tabs */}
-      <View style={styles.tabContainer}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabsScroll}>
-          {PHRASE_CATEGORIES.map(cat => (
-            <TouchableOpacity
-              key={cat.id}
-              onPress={() => setActiveCategory(cat.id as CategoryId)}
-              style={[
-                styles.tab,
-                { 
-                  backgroundColor: activeCategory === cat.id ? colors.primary : colors.card,
-                  borderColor: activeCategory === cat.id ? colors.primary : colors.border,
-                }
-              ]}
-            >
-              <Text style={{ 
-                color: activeCategory === cat.id ? '#FFF' : colors.text,
-                fontWeight: 'bold' 
-              }}>
-                {cat.label}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-      </View>
-      
+      <CategoryTabs
+        activeCategory={activeCategory}
+        onCategorySelect={setActiveCategory}
+        colors={colors}
+      />
+
       {/* Grid of Phrases */}
       <ScrollView contentContainerStyle={styles.grid}>
         {filteredPhrases.map(phrase => {
-          const Icon = ICON_MAP[phrase.iconName] || ICON_MAP['custom'];
-          const displayLabel = getActiveLabel(phrase); // Get localized label
-
+          const displayLabel = getActiveLabel(phrase);
           return (
-            <TouchableOpacity
+            <PhraseTile
               key={phrase.id}
-              onPress={() => handlePhraseTap(phrase)}
-              onLongPress={() => handleLongPress(phrase)}
-              activeOpacity={0.6}
-              style={[
-                styles.tile,
-                { 
-                  backgroundColor: colors.card,
-                  borderColor: colors.border,
-                  width: TILE_SIZE,
-                  height: TILE_SIZE
-                }
-              ]}
-            >
-              <View style={[styles.iconCircle, { backgroundColor: phrase.color ? `${phrase.color}20` : `${colors.primary}20` }]}>
-                <Icon size={32} color={phrase.color || colors.primary} />
-              </View>
-              
-              <Text style={[styles.tileLabel, { color: colors.text }]} numberOfLines={2}>
-                {displayLabel}
-              </Text>
-              
-              <View style={styles.ttsIcon}>
-                <Volume2 size={16} color={colors.subText} />
-              </View>
-            </TouchableOpacity>
+              phrase={phrase}
+              colors={colors}
+              onTap={handlePhraseTap}
+              onEdit={openEditModal}
+              onDelete={handleDelete}
+              displayLabel={displayLabel!}
+            />
           );
         })}
 
@@ -191,7 +204,7 @@ export default function PhraseboardScreen() {
           style={[
             styles.tile,
             styles.addTile,
-            { 
+            {
               width: TILE_SIZE,
               height: TILE_SIZE,
               borderColor: colors.primary,
@@ -209,42 +222,96 @@ export default function PhraseboardScreen() {
         visible={isModalVisible}
         transparent={true}
         animationType="slide"
-        onRequestClose={() => setIsModalVisible(false)}
+        onRequestClose={() => { setIsModalVisible(false); resetForm(); }}
       >
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
-            <View style={styles.modalHeader}>
-              <Text style={[styles.modalTitle, { color: colors.text }]}>Add New Phrase</Text>
-              <TouchableOpacity onPress={() => setIsModalVisible(false)}>
-                <X size={24} color={colors.subText} />
+          <ScrollView contentContainerStyle={{ padding: 20 }}>
+            <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
+              <View style={styles.modalHeader}>
+                <Text style={[styles.modalTitle, { color: colors.text }]}>
+                  {editingId ? 'Edit Phrase' : 'Add New Phrase'}
+                </Text>
+                <TouchableOpacity onPress={() => { setIsModalVisible(false); resetForm(); }}>
+                  <X size={24} color={colors.subText} />
+                </TouchableOpacity>
+              </View>
+
+              {/* English Section */}
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>🇬🇧 English (Required)</Text>
+
+              <Text style={[styles.label, { color: colors.subText }]}>Label (Short Name)</Text>
+              <TextInput
+                style={[styles.input, { color: colors.text, borderColor: colors.border }]}
+                placeholder="e.g., Juice"
+                placeholderTextColor={colors.subText}
+                value={newLabel}
+                onChangeText={setNewLabel}
+              />
+
+              <Text style={[styles.label, { color: colors.subText }]}>Spoken Text (TTS)</Text>
+              <TextInput
+                style={[styles.input, { color: colors.text, borderColor: colors.border }]}
+                placeholder="e.g., I want apple juice please."
+                placeholderTextColor={colors.subText}
+                value={newText}
+                onChangeText={setNewText}
+                multiline
+              />
+
+              {/* Twi Section */}
+              <Text style={[styles.sectionTitle, { color: colors.text, marginTop: 20 }]}>🇬🇭 Twi (Optional)</Text>
+
+              <Text style={[styles.label, { color: colors.subText }]}>Label (Twi)</Text>
+              <TextInput
+                style={[styles.input, { color: colors.text, borderColor: colors.border }]}
+                placeholder="e.g., Nsuo"
+                placeholderTextColor={colors.subText}
+                value={newLabelTwi}
+                onChangeText={setNewLabelTwi}
+              />
+
+              <Text style={[styles.label, { color: colors.subText }]}>Spoken Text (Twi)</Text>
+              <TextInput
+                style={[styles.input, { color: colors.text, borderColor: colors.border }]}
+                placeholder="e.g., Mepa kyɛw, mehia nsuo."
+                placeholderTextColor={colors.subText}
+                value={newTextTwi}
+                onChangeText={setNewTextTwi}
+                multiline
+              />
+
+              {/* Ga Section */}
+              <Text style={[styles.sectionTitle, { color: colors.text, marginTop: 20 }]}>🇬🇭 Ga (Optional)</Text>
+
+              <Text style={[styles.label, { color: colors.subText }]}>Label (Ga)</Text>
+              <TextInput
+                style={[styles.input, { color: colors.text, borderColor: colors.border }]}
+                placeholder="e.g., Nu"
+                placeholderTextColor={colors.subText}
+                value={newLabelGa}
+                onChangeText={setNewLabelGa}
+              />
+
+              <Text style={[styles.label, { color: colors.subText }]}>Spoken Text (Ga)</Text>
+              <TextInput
+                style={[styles.input, { color: colors.text, borderColor: colors.border }]}
+                placeholder="e.g., Ofainɛ, mihe nu."
+                placeholderTextColor={colors.subText}
+                value={newTextGa}
+                onChangeText={setNewTextGa}
+                multiline
+              />
+
+              <TouchableOpacity
+                style={[styles.saveButton, { backgroundColor: colors.primary, marginTop: 20 }]}
+                onPress={handleAddPhrase}
+              >
+                <Text style={styles.saveButtonText}>
+                  {editingId ? 'Update Phrase' : 'Save Phrase'}
+                </Text>
               </TouchableOpacity>
             </View>
-
-            <Text style={[styles.label, { color: colors.subText }]}>Label (Short Name)</Text>
-            <TextInput 
-              style={[styles.input, { color: colors.text, borderColor: colors.border }]}
-              placeholder="e.g., Juice"
-              placeholderTextColor={colors.subText}
-              value={newLabel}
-              onChangeText={setNewLabel}
-            />
-
-            <Text style={[styles.label, { color: colors.subText }]}>Spoken Text (TTS)</Text>
-            <TextInput 
-              style={[styles.input, { color: colors.text, borderColor: colors.border }]}
-              placeholder="e.g., I want apple juice please."
-              placeholderTextColor={colors.subText}
-              value={newText}
-              onChangeText={setNewText}
-            />
-
-            <TouchableOpacity 
-              style={[styles.saveButton, { backgroundColor: colors.primary }]}
-              onPress={handleAddPhrase}
-            >
-              <Text style={styles.saveButtonText}>Save Phrase</Text>
-            </TouchableOpacity>
-          </View>
+          </ScrollView>
         </View>
       </Modal>
 
@@ -252,106 +319,3 @@ export default function PhraseboardScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1 },
-  header: { 
-    padding: 20, 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    justifyContent: 'space-between', 
-    borderBottomWidth: 1 
-  },
-  headerTitle: { fontSize: 22, fontWeight: 'bold' },
-  backBtn: { padding: 5 },
-  
-  // Tabs
-  tabContainer: { marginVertical: 15, height: 45 },
-  tabsScroll: { paddingHorizontal: 20, gap: 10 },
-  tab: {
-    paddingHorizontal: 20,
-    paddingVertical: 8,
-    borderRadius: 25,
-    borderWidth: 1,
-    height: 40,
-    justifyContent: 'center'
-  },
-
-  // Grid
-  grid: { 
-    flexDirection: 'row', 
-    flexWrap: 'wrap', 
-    paddingHorizontal: 20, 
-    gap: 20,
-    paddingBottom: 40
-  },
-  tile: {
-    borderRadius: 16,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    position: 'relative',
-    padding: 10
-  },
-  addTile: {
-    borderStyle: 'dashed',
-    backgroundColor: 'transparent',
-    elevation: 0
-  },
-  iconCircle: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 10
-  },
-  tileLabel: {
-    fontSize: 18,
-    fontWeight: '600',
-    textAlign: 'center'
-  },
-  ttsIcon: {
-    position: 'absolute',
-    top: 10,
-    right: 10
-  },
-
-  // Modal
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'center',
-    padding: 20
-  },
-  modalContent: {
-    borderRadius: 16,
-    padding: 20,
-    elevation: 5
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 20
-  },
-  modalTitle: { fontSize: 20, fontWeight: 'bold' },
-  label: { fontSize: 14, marginBottom: 8, fontWeight: '500' },
-  input: {
-    borderWidth: 1,
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-    marginBottom: 20
-  },
-  saveButton: {
-    padding: 16,
-    borderRadius: 12,
-    alignItems: 'center'
-  },
-  saveButtonText: { color: '#FFF', fontWeight: 'bold', fontSize: 16 }
-});

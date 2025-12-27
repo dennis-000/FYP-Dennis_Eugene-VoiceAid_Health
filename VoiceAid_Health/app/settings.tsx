@@ -1,24 +1,29 @@
-import React, { useContext, useState } from 'react';
-import { 
-  StyleSheet, 
-  Text, 
-  View, 
-  TouchableOpacity, 
-  ScrollView, 
-  Switch, 
-  SafeAreaView 
-} from 'react-native';
 import { useRouter } from 'expo-router';
-import { 
-  ArrowLeft, 
-  Sun, 
-  Moon, 
-  Type, 
-  UserCog, 
-  Info,
+import {
+  ArrowLeft,
   ChevronRight,
-  ClipboardList
+  ClipboardList,
+  HeartPulse,
+  Info,
+  Moon,
+  RefreshCw,
+  Sun,
+  Type,
+  User,
+  UserCog
 } from 'lucide-react-native';
+import React, { useContext, useState } from 'react';
+import {
+  Alert,
+  SafeAreaView,
+  ScrollView,
+  Text,
+  TouchableOpacity,
+  View
+} from 'react-native';
+import { SettingsRow } from '../components/SettingsRow';
+import { useRole } from '../contexts/RoleContext';
+import { settingsStyles as styles } from '../styles/settings.styles';
 import { AppContext } from './_layout';
 
 /**
@@ -51,102 +56,132 @@ const SectionTitle = ({ title, color }: { title: string, color: string }) => (
 export default function SettingsScreen() {
   const router = useRouter();
   const { colors, themeMode, toggleTheme } = useContext(AppContext);
-  
+  const { role, setRole } = useRole();
+
   // Local state
   const [caregiverMode, setCaregiverMode] = useState(false);
-  const [largeText, setLargeText] = useState(true); 
+  const [largeText, setLargeText] = useState(true);
+
+  const handleRoleSwitch = () => {
+    Alert.alert(
+      'Switch Role',
+      `Change role from ${role === 'patient' ? 'Patient' : 'Caregiver'} to ${role === 'patient' ? 'Caregiver' : 'Patient'}?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Switch',
+          onPress: () => {
+            const newRole = role === 'patient' ? 'caregiver' : 'patient';
+            setRole(newRole);
+          },
+        },
+      ]
+    );
+  };
+
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]}>
       <Header title="Settings" onBack={() => router.back()} />
-      
+
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        
+
         {/* ACCESSIBILITY SECTION */}
         <SectionTitle title="Accessibility" color={colors.subText} />
         <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          
+
           {/* Theme Toggle */}
-          <View style={styles.settingRow}>
-            <View style={styles.rowLeft}>
-              <View style={[styles.iconBox, { backgroundColor: themeMode === 'high-contrast' ? '#333' : '#FEF3C7' }]}>
-                {themeMode === 'high-contrast' ? (
-                  <Sun size={20} color="#FFD700" />
-                ) : (
-                  <Moon size={20} color="#D97706" />
-                )}
-              </View>
-              <View>
-                <Text style={[styles.settingLabel, { color: colors.text }]}>High Contrast</Text>
-                <Text style={[styles.settingSub, { color: colors.subText }]}>
-                  {themeMode === 'high-contrast' ? 'On' : 'Off'}
-                </Text>
-              </View>
-            </View>
-            <Switch 
-              value={themeMode === 'high-contrast'} 
-              onValueChange={toggleTheme}
-              trackColor={{ false: '#767577', true: colors.primary }}
-              thumbColor={themeMode === 'high-contrast' ? '#fff' : '#f4f3f4'}
-            />
-          </View>
-          
+          <SettingsRow
+            icon={themeMode === 'high-contrast' ? Sun : Moon}
+            iconColor={themeMode === 'high-contrast' ? "#FFD700" : "#D97706"}
+            iconBg={themeMode === 'high-contrast' ? '#333' : '#FEF3C7'}
+            title="High Contrast"
+            subtitle={themeMode === 'high-contrast' ? 'On' : 'Off'}
+            switchValue={themeMode === 'high-contrast'}
+            onSwitchChange={toggleTheme}
+            activeTrackColor={colors.primary}
+            titleColor={colors.text}
+            subtitleColor={colors.subText}
+          />
+
           {/* Large Text Toggle */}
-          <View style={[styles.settingRow, { borderTopWidth: 1, borderTopColor: colors.border }]}>
-             <View style={styles.rowLeft}>
-              <View style={[styles.iconBox, { backgroundColor: '#DBEAFE' }]}>
-                <Type size={20} color="#2563EB" />
-              </View>
-              <View>
-                <Text style={[styles.settingLabel, { color: colors.text }]}>Large Text</Text>
-                <Text style={[styles.settingSub, { color: colors.subText }]}>For better readability</Text>
-              </View>
-            </View>
-            <Switch 
-              value={largeText} 
-              onValueChange={setLargeText}
-              trackColor={{ false: '#767577', true: colors.primary }}
-            /> 
-          </View>
+          <SettingsRow
+            icon={Type}
+            iconColor="#2563EB"
+            iconBg="#DBEAFE"
+            title="Large Text"
+            subtitle="For better readability"
+            switchValue={largeText}
+            onSwitchChange={setLargeText}
+            activeTrackColor={colors.primary}
+            showBorderTop
+            borderColor={colors.border}
+            titleColor={colors.text}
+            subtitleColor={colors.subText}
+          />
+        </View>
+
+        {/* USER ROLE SECTION */}
+        <SectionTitle title="User Role" color={colors.subText} />
+        <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
+
+          {/* Current Role Display */}
+          <SettingsRow
+            icon={role === 'patient' ? User : HeartPulse}
+            iconColor={role === 'patient' ? "#2563EB" : "#059669"}
+            iconBg={role === 'patient' ? '#DBEAFE' : '#D1FAE5'}
+            title="Current Role"
+            subtitle={role === 'patient' ? 'Patient' : 'Caregiver / Healthcare Worker'}
+            titleColor={colors.text}
+            subtitleColor={colors.subText}
+          />
+
+          {/* Switch Role Button */}
+          <SettingsRow
+            icon={RefreshCw}
+            iconColor="#D97706"
+            iconBg="#FEF3C7"
+            title="Switch Role"
+            subtitle={`Change to ${role === 'patient' ? 'Caregiver' : 'Patient'} mode`}
+            onPress={handleRoleSwitch}
+            rightElement={<ChevronRight size={20} color={colors.subText} />}
+            showBorderTop
+            borderColor={colors.border}
+            titleColor={colors.text}
+            subtitleColor={colors.subText}
+          />
         </View>
 
         {/* CAREGIVER CONTROLS */}
         <SectionTitle title="Caregiver Mode" color={colors.subText} />
         <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          
-          <View style={styles.settingRow}>
-            <View style={styles.rowLeft}>
-               <View style={[styles.iconBox, { backgroundColor: '#D1FAE5' }]}>
-                <UserCog size={20} color="#059669" />
-               </View>
-               <View style={{ flex: 1, paddingRight: 10 }}>
-                <Text style={[styles.settingLabel, { color: colors.text }]}>Caregiver Access</Text>
-                <Text style={[styles.settingSub, { color: colors.subText }]}>
-                  Enable editing and logs.
-                </Text>
-               </View>
-            </View>
-            <Switch 
-              value={caregiverMode} 
-              onValueChange={setCaregiverMode}
-              trackColor={{ false: '#767577', true: colors.success }}
-            /> 
-          </View>
 
-          {/* NEW: HISTORY BUTTON */}
+          <SettingsRow
+            icon={UserCog}
+            iconColor="#059669"
+            iconBg="#D1FAE5"
+            title="Caregiver Access"
+            subtitle="Enable editing and logs."
+            switchValue={caregiverMode}
+            onSwitchChange={setCaregiverMode}
+            activeTrackColor={colors.success}
+            titleColor={colors.text}
+            subtitleColor={colors.subText}
+          />
+
           {caregiverMode && (
-            <TouchableOpacity 
-              style={[styles.settingRow, { borderTopWidth: 1, borderTopColor: colors.border }]}
+            <SettingsRow
+              icon={ClipboardList}
+              iconColor={colors.primary}
+              iconBg="#E0E7FF"
+              title="View Patient Logs"
               onPress={() => router.push("/history")}
-            >
-              <View style={styles.rowLeft}>
-                 <View style={[styles.iconBox, { backgroundColor: '#E0E7FF' }]}>
-                  <ClipboardList size={20} color={colors.primary} />
-                 </View>
-                 <Text style={[styles.settingLabel, { color: colors.text }]}>View Patient Logs</Text>
-              </View>
-              <ChevronRight size={20} color={colors.subText} />
-            </TouchableOpacity>
+              rightElement={<ChevronRight size={20} color={colors.subText} />}
+              showBorderTop
+              borderColor={colors.border}
+              titleColor={colors.text}
+              subtitleColor={colors.subText}
+            />
           )}
 
         </View>
@@ -154,14 +189,14 @@ export default function SettingsScreen() {
         {/* APP INFO */}
         <SectionTitle title="About" color={colors.subText} />
         <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
-           <View style={styles.settingRow}>
-             <View style={styles.rowLeft}>
-               <View style={[styles.iconBox, { backgroundColor: '#F3F4F6' }]}>
-                <Info size={20} color="#4B5563" />
-               </View>
-               <Text style={[styles.settingLabel, { color: colors.text }]}>Version 1.0.0 (MVP)</Text>
-             </View>
-           </View>
+          <SettingsRow
+            icon={Info}
+            iconColor="#4B5563"
+            iconBg="#F3F4F6"
+            title="Version 1.0.0 (MVP)"
+            titleColor={colors.text}
+            subtitleColor={colors.subText}
+          />
         </View>
 
       </ScrollView>
@@ -169,61 +204,3 @@ export default function SettingsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1 },
-  header: { 
-    padding: 20, 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    justifyContent: 'space-between', 
-    borderBottomWidth: 1 
-  },
-  headerTitle: { fontSize: 22, fontWeight: 'bold' },
-  backBtn: { padding: 5 },
-  scrollContent: { padding: 20 },
-  
-  // Section Styles
-  sectionTitle: { 
-    fontSize: 13, 
-    fontWeight: 'bold', 
-    marginBottom: 8, 
-    marginLeft: 4,
-    marginTop: 10,
-    letterSpacing: 1 
-  },
-  section: { 
-    borderRadius: 12, 
-    borderWidth: 1, 
-    marginBottom: 20,
-    overflow: 'hidden'
-  },
-  
-  // Row Styles
-  settingRow: { 
-    flexDirection: 'row', 
-    justifyContent: 'space-between', 
-    alignItems: 'center', 
-    padding: 16 
-  },
-  rowLeft: { 
-    flexDirection: 'row', 
-    alignItems: 'center',
-    flex: 1
-  },
-  iconBox: {
-    width: 36,
-    height: 36,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12
-  },
-  settingLabel: { 
-    fontSize: 16, 
-    fontWeight: '500' 
-  },
-  settingSub: {
-    fontSize: 13,
-    marginTop: 2
-  }
-});
