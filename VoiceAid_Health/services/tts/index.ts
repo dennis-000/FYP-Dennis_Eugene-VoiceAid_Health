@@ -1,7 +1,8 @@
 import { Audio } from 'expo-av';
 import { documentDirectory, EncodingType, writeAsStringAsync } from 'expo-file-system/legacy';
 import * as Speech from 'expo-speech';
-import { DEFAULT_OPTIONS, GHANA_NLP_API_KEY, GHANA_NLP_URL, SupportedTTSLanguage } from './config';
+import { ENDPOINTS } from '../../constants/config';
+import { DEFAULT_OPTIONS, SupportedTTSLanguage } from './config';
 
 /**
  * ==========================================
@@ -32,34 +33,23 @@ export const TTSService = {
             return;
         }
 
-        // 3. STRATEGY B: API TTS for Twi / Ga
-        // Check if we actually have a key before trying the API
-        if (!GHANA_NLP_API_KEY || GHANA_NLP_API_KEY.includes("YOUR_GHANA_NLP_KEY")) {
-            console.log("[TTS] No Ghana NLP Key found. Using Native TTS fallback.");
-            // Fallback to en-GH (Ghana English) which pronounces local words better than en-US
-            Speech.speak(text, { ...DEFAULT_OPTIONS, language: 'en-GH' });
-            return;
-        }
+        // 3. STRATEGY B: Local API TTS for Twi / Ga
+        // (Using Kasanoma model served via FastAPI)
 
         try {
             console.log(`[TTS] Fetching Ghana NLP audio for ${language}: ${text}`);
 
+            // Note: 'ga' might fallback to English in backend if no model yet
             const langCode = language === 'twi' ? 'tw' : 'ga';
 
-            // Note: 'ga_speaker_1' is a guess. If the API returns 500/400, it means this ID is wrong.
-            const speakerId = language === 'twi' ? 'twi_speaker_4' : 'ga_speaker_1';
-
-            const response = await fetch(GHANA_NLP_URL, {
+            const response = await fetch(ENDPOINTS.TTS, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Cache-Control': 'no-cache',
-                    'Ocp-Apim-Subscription-Key': GHANA_NLP_API_KEY,
                 },
                 body: JSON.stringify({
                     text: text,
                     language: langCode,
-                    speaker_id: speakerId
                 })
             });
 

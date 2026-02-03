@@ -15,17 +15,14 @@ import { ASRResponse, SupportedLanguage } from './types';
 import {
     calculateConfidence,
     calculateLanguageConfidence,
-    detectLanguage,
     detectNoise,
-    extractWordConfidences,
-    mockFallbackResponse
+    extractWordConfidences
 } from './utils';
 
-// ACCESS KEY FROM .ENV FILE
-const GROQ_API_KEY = process.env.EXPO_PUBLIC_GROQ_API_KEY;
+import { ENDPOINTS } from '../../constants/config';
 
-// Groq OpenAI-compatible endpoint
-const GROQ_URL = "https://api.groq.com/openai/v1/audio/transcriptions";
+// Groq OpenAI-compatible endpoint (REPLACED WITH LOCAL BACKEND)
+// const GROQ_URL = "https://api.groq.com/openai/v1/audio/transcriptions";
 
 export { ASRResponse, SupportedLanguage };
 
@@ -37,10 +34,10 @@ export const ASRService = {
     processAudio: async (uri: string, selectedLang: SupportedLanguage): Promise<ASRResponse> => {
 
         // Safety Check
-        if (!GROQ_API_KEY || GROQ_API_KEY.includes("paste_your_key")) {
-            console.warn("[ASR Service] ⚠️ No valid Groq API Key found. Using Simulation.");
-            return mockFallbackResponse(selectedLang);
-        }
+        // if (!GROQ_API_KEY || GROQ_API_KEY.includes("paste_your_key")) {
+        //     console.warn("[ASR Service] ⚠️ No valid Groq API Key found. Using Simulation.");
+        //     return mockFallbackResponse(selectedLang);
+        // }
 
         try {
             console.log(`[ASR Service] 🎤 Processing audio with enhanced ASR...`);
@@ -71,28 +68,17 @@ export const ASRService = {
             }
 
 
-            // 2. Configure Model with Enhanced Parameters for Speech-Impaired Users
-            formData.append('model', 'whisper-large-v3');
-
-            // Lower temperature for more deterministic and accurate transcription
-            // This is crucial for speech-impaired users who may have unclear speech
-            formData.append('temperature', '0.0');
-
-            // Use verbose_json for detailed confidence scoring
-            formData.append('response_format', 'verbose_json');
-
+            // 2. Configure Language for Local Backend
             // Language hint if not auto-detect
             if (selectedLang !== 'auto') {
-                const langCode = selectedLang === 'twi' ? 'tw' : selectedLang === 'ga' ? 'gaa' : 'en';
+                const langCode = selectedLang === 'twi' ? 'tw' : 'en';
                 formData.append('language', langCode);
             }
 
-            // 3. Send Request
-            const response = await fetch(GROQ_URL, {
+            // 3. Send Request to Local Backend
+            const response = await fetch(ENDPOINTS.ASR, {
                 method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${GROQ_API_KEY}`,
-                },
+                // Headers are automatically handled for FormData
                 body: formData,
             });
 
@@ -115,9 +101,8 @@ export const ASRService = {
             const rawText = transcription;
 
             // Detect language if auto mode
-            const detectedLang = selectedLang === 'auto'
-                ? detectLanguage(cleanText, data.language)
-                : selectedLang;
+            // Detect language if auto mode
+            const detectedLang = data.language || selectedLang;
 
             // Calculate confidence score
             const confidence = calculateConfidence(data, cleanText);

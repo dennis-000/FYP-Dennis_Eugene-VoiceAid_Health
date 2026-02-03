@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import { CategoryTabs } from '../components/CategoryTabs';
 import { PhraseTile } from '../components/PhraseTile';
+import { useRole } from '../contexts/RoleContext';
 import { CategoryId, Phrase, PhraseService } from '../services/phrase';
 import { TTSService } from '../services/tts';
 import { phraseboardStyles as styles } from '../styles/phraseboard.styles';
@@ -39,6 +40,8 @@ const Header = ({ title, onBack }: { title: string, onBack: () => void }) => {
 export default function PhraseboardScreen() {
   const router = useRouter();
   const { colors, language } = useContext(AppContext);
+  const { role } = useRole();
+  const isCaregiver = role === 'caregiver';
 
   //State
   const [phrases, setPhrases] = useState<Phrase[]>([]);
@@ -194,26 +197,29 @@ export default function PhraseboardScreen() {
               onEdit={openEditModal}
               onDelete={handleDelete}
               displayLabel={displayLabel!}
+              isEditingEnabled={isCaregiver}
             />
           );
         })}
 
         {/* Add Button (Last item in grid) */}
-        <TouchableOpacity
-          onPress={() => setIsModalVisible(true)}
-          style={[
-            styles.tile,
-            styles.addTile,
-            {
-              width: TILE_SIZE,
-              height: TILE_SIZE,
-              borderColor: colors.primary,
-            }
-          ]}
-        >
-          <Plus size={40} color={colors.primary} />
-          <Text style={[styles.tileLabel, { color: colors.primary, marginTop: 8 }]}>Add New</Text>
-        </TouchableOpacity>
+        {isCaregiver && (
+          <TouchableOpacity
+            onPress={() => setIsModalVisible(true)}
+            style={[
+              styles.tile,
+              styles.addTile,
+              {
+                width: TILE_SIZE,
+                height: TILE_SIZE,
+                borderColor: colors.primary,
+              }
+            ]}
+          >
+            <Plus size={40} color={colors.primary} />
+            <Text style={[styles.tileLabel, { color: colors.primary, marginTop: 8 }]}>Add New</Text>
+          </TouchableOpacity>
+        )}
 
       </ScrollView>
 

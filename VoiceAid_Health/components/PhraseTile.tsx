@@ -14,6 +14,7 @@ interface PhraseTileProps {
     onEdit: (phrase: Phrase) => void;
     onDelete: (id: string) => void;
     displayLabel: string;
+    isEditingEnabled?: boolean;
 }
 
 export const PhraseTile: React.FC<PhraseTileProps> = ({
@@ -22,7 +23,8 @@ export const PhraseTile: React.FC<PhraseTileProps> = ({
     onTap,
     onEdit,
     onDelete,
-    displayLabel
+    displayLabel,
+    isEditingEnabled = false
 }) => {
     const Icon = ICON_MAP[phrase.iconName] || ICON_MAP['custom'];
 
@@ -41,30 +43,32 @@ export const PhraseTile: React.FC<PhraseTileProps> = ({
             ]}
         >
             {/* Three-Dots Menu Button */}
-            <TouchableOpacity
-                onPress={(e) => {
-                    e.stopPropagation();
-                    Alert.alert(
-                        "Manage Phrase",
-                        `Edit or delete "${displayLabel}"?`,
-                        [
-                            { text: "Cancel", style: "cancel" },
-                            {
-                                text: "Edit",
-                                onPress: () => onEdit(phrase)
-                            },
-                            {
-                                text: "Delete",
-                                style: "destructive",
-                                onPress: () => onDelete(phrase.id)
-                            }
-                        ]
-                    );
-                }}
-                style={styles.menuButton}
-            >
-                <MoreHorizontal size={20} color={colors.subText} />
-            </TouchableOpacity>
+            {isEditingEnabled && (
+                <TouchableOpacity
+                    onPress={(e) => {
+                        e.stopPropagation();
+                        Alert.alert(
+                            "Manage Phrase",
+                            `Edit or delete "${displayLabel}"?`,
+                            [
+                                { text: "Cancel", style: "cancel" },
+                                {
+                                    text: "Edit",
+                                    onPress: () => onEdit(phrase)
+                                },
+                                {
+                                    text: "Delete",
+                                    style: "destructive",
+                                    onPress: () => onDelete(phrase.id)
+                                }
+                            ]
+                        );
+                    }}
+                    style={styles.menuButton}
+                >
+                    <MoreHorizontal size={20} color={colors.subText} />
+                </TouchableOpacity>
+            )}
 
             <View style={[styles.iconCircle, { backgroundColor: phrase.color ? `${phrase.color}20` : `${colors.primary}20` }]}>
                 <Icon size={32} color={phrase.color || colors.primary} />
