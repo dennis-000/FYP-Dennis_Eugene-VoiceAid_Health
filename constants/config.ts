@@ -9,7 +9,7 @@
 
 import { Platform } from 'react-native';
 
-const LOCAL_IP = "192.168.1.5"; // CHANGE THIS to your IP for physical device testing
+const LOCAL_IP = "10.51.56.99"; // Updated for physical device connection
 const ANDROID_EMULATOR = "10.0.2.2";
 const IOS_SIMULATOR = "localhost";
 
