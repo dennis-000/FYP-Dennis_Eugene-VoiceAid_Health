@@ -1,50 +1,90 @@
-# Welcome to your Expo app 👋
+# VoiceAid Health  
+### An Assistive Communication System for Speech‑Impaired Patients in Ghanaian Healthcare Settings
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+---
 
-## Get started
+## 📌 Project Overview
+**VoiceAid Health** is a mobile‑based assistive communication system designed to help **speech‑impaired individuals** communicate more effectively with caregivers, family members, and healthcare professionals. The system leverages **speech‑to‑text (ASR)**, **predictive intent suggestions**, **text‑to‑speech (TTS)**, and **visual phraseboards** to reduce communication barriers in hospitals and daily life.
 
-1. Install dependencies
+The project is informed by real‑world requirements gathered from the **Speech and Language Therapy Unit at Korle Bu Teaching Hospital**, where it was identified that speech impairment varies widely in severity, pronunciation clarity, and communication strategies. As a result, the system focuses on **vocalization‑based assistance**, supported by **icons, suggested phrases, and caregiver involvement**, rather than gesture‑based interaction.
 
-   ```bash
-   npm install
-   ```
+---
 
-2. Start the app
+## 🎯 Problem Statement
+Many speech‑impaired individuals—such as patients with cerebral palsy, stammering disorders, stroke‑related speech loss, or speech delays—struggle to communicate their needs clearly, especially in healthcare environments.
 
-   ```bash
-   npx expo start
-   ```
+Existing communication systems often fail due to:
+- Unclear pronunciation and distorted speech
+- Repetition, stretching, or blocking of words
+- Poor support for local Ghanaian languages
+- Limited consideration for caregivers and therapists
 
-In the output, you'll find options to open the app in a
+This communication gap can lead to frustration, misinterpretation, and reduced quality of care.
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+---
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+## 💡 Proposed Solution
+VoiceAid Health provides a **multimodal assistive communication platform** that enables users to express themselves clearly and efficiently. The system:
+- Transcribes impaired speech into readable text
+- Predicts the intended meaning of unclear speech
+- Converts selected messages into clear synthesized speech
+- Uses icons and predefined phrases to support understanding
+- Supports caregivers in managing daily care routines and therapy tasks
 
-## Get a fresh project
+The solution is designed for **both patients and the people around them**, recognizing that effective communication and therapy involve caregivers, family members, and healthcare professionals.
 
-When you're ready, run:
+---
 
-```bash
-npm run reset-project
-```
+## 🚀 Key Features
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+### 🔹 Core Functionalities
+- **Automatic Speech‑to‑Text (ASR)** for impaired speech  
+- **Predictive Intent Suggestions** to clarify unclear utterances  
+- **Text‑to‑Speech (TTS)** for audible communication  
+- **Visual Phraseboard** with icons and commonly used phrases  
+- **Daily Care Routine & Therapy Tasks Reminder**  
+- **Caregiver Mode** for managing phrases, reminders, and preferences  
+- **Accessibility‑Focused UI** (large buttons, high contrast, simple navigation)
 
-## Learn more
+---
 
-To learn more about developing your project with Expo, look at the following resources:
+## 🧠 System Design Philosophy
+- Targets speech‑impaired users who can vocalize, even if speech is unclear
+- Avoids gesture‑based interaction due to capture and accuracy limitations
+- Focuses on **meaning prediction**, not perfect transcription
+- Ensures a low learning curve for patients, caregivers, and healthcare staff
+- Designed for future **machine‑learning model training** in local languages
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+---
 
-## Join the community
+## 🏥 Use Case Context
+VoiceAid Health is intended for use in:
+- Hospitals and clinics  
+- Home‑based care environments  
+- Speech therapy and rehabilitation sessions  
+- Daily communication between patients and caregivers  
 
-Join our community of developers creating universal apps.
+---
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+## 🛠️ Technology Stack (Planned / In Progress)
+- **Frontend:** React Native (Expo)
+- **Backend:** REST APIs (Node.js / Firebase – planned)
+- **Speech Services:** External ASR APIs (temporary), custom ML models (future)
+- **Design:** Figma (high‑fidelity UI and design system)
+- **Machine Learning (Future):** Custom ASR models for Ghanaian languages (Twi, Ga)
+
+---
+
+## 📈 Future Enhancements
+- Personalized voice profile training per user
+- Offline speech recognition support
+- Additional local language support
+- Therapist and caregiver web dashboard
+- Detection of urgency or emotional cues from speech patterns
+
+---
+
+## 🎓 Academic Context
+This project is developed as a **Final Year Project** under the **Department of Computer Science, Pentecost University**. It is informed by direct engagement with healthcare professionals at **Korle Bu Teaching Hospital**, ensuring real‑world relevance and practical applicability.
+
+---
