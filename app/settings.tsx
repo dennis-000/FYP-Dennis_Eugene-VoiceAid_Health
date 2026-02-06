@@ -5,8 +5,8 @@ import {
   ClipboardList,
   HeartPulse,
   Info,
+  LogOut,
   Moon,
-  RefreshCw,
   Sun,
   Type,
   User,
@@ -22,6 +22,7 @@ import {
   View
 } from 'react-native';
 import { SettingsRow } from '../components/SettingsRow';
+import { useAuth } from '../contexts/AuthContext';
 import { useRole } from '../contexts/RoleContext';
 import { settingsStyles as styles } from '../styles/settings.styles';
 import { AppContext } from './_layout';
@@ -56,25 +57,43 @@ const SectionTitle = ({ title, color }: { title: string, color: string }) => (
 export default function SettingsScreen() {
   const router = useRouter();
   const { colors, themeMode, toggleTheme } = useContext(AppContext);
-  const { role, setRole } = useRole();
+  const { role, setRole, patientType } = useRole();
+  const { signOut } = useAuth();
 
   // Local state
   const [caregiverMode, setCaregiverMode] = useState(false);
   const [largeText, setLargeText] = useState(true);
 
-  const handleRoleSwitch = () => {
+  const handleLogout = async () => {
     Alert.alert(
-      'Switch Role',
-      `Change role from ${role === 'patient' ? 'Patient' : 'Caregiver'} to ${role === 'patient' ? 'Caregiver' : 'Patient'}?`,
+      'Logout',
+      'Are you sure you want to logout? You will return to the welcome screen.',
       [
-        { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Switch',
-          onPress: () => {
-            const newRole = role === 'patient' ? 'caregiver' : 'patient';
-            setRole(newRole);
-          },
+          text: 'Cancel',
+          style: 'cancel'
         },
+        {
+          text: 'Logout',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              // Clear authentication
+              await signOut();
+
+              // Clear role from AsyncStorage
+              const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+              await AsyncStorage.removeItem('@voiceaid_role');
+              await AsyncStorage.removeItem('@voiceaid_patient_type');
+
+              // Navigate to welcome screen
+              router.replace('/welcome');
+            } catch (error) {
+              console.error('Error logging out:', error);
+              Alert.alert('Error', 'Failed to logout. Please try again.');
+            }
+          }
+        }
       ]
     );
   };
@@ -136,20 +155,12 @@ export default function SettingsScreen() {
             subtitleColor={colors.subText}
           />
 
-          {/* Switch Role Button */}
-          <SettingsRow
-            icon={RefreshCw}
-            iconColor="#D97706"
-            iconBg="#FEF3C7"
-            title="Switch Role"
-            subtitle={`Change to ${role === 'patient' ? 'Caregiver' : 'Patient'} mode`}
-            onPress={handleRoleSwitch}
-            rightElement={<ChevronRight size={20} color={colors.subText} />}
-            showBorderTop
-            borderColor={colors.border}
-            titleColor={colors.text}
-            subtitleColor={colors.subText}
-          />
+          {/* Info about changing roles */}
+          <View style={{ padding: 16, paddingTop: 8 }}>
+            <Text style={[{ fontSize: 13, color: colors.subText, lineHeight: 18 }]}>
+              To change your role, please logout and select a different option from the welcome screen.
+            </Text>
+          </View>
         </View>
 
         {/* CAREGIVER CONTROLS */}
@@ -184,6 +195,22 @@ export default function SettingsScreen() {
             />
           )}
 
+        </View>
+
+        {/* LOGOUT SECTION */}
+        <SectionTitle title="Account" color={colors.subText} />
+        <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <SettingsRow
+            icon={LogOut}
+            iconColor="#EF4444"
+            iconBg="#FEE2E2"
+            title="Logout"
+            subtitle="Return to welcome screen"
+            onPress={handleLogout}
+            rightElement={<ChevronRight size={20} color={colors.subText} />}
+            titleColor={colors.text}
+            subtitleColor={colors.subText}
+          />
         </View>
 
         {/* APP INFO */}

@@ -32,9 +32,13 @@ export default function WelcomeScreen() {
     const { setRole } = useRole();
 
     const handleRoleSelection = async (selectedRole: 'patient' | 'caregiver') => {
-        await setRole(selectedRole);
-        // Navigate to home screen
-        router.replace('/');
+        if (selectedRole === 'patient') {
+            // Navigate to patient setup for type selection (no auth required)
+            router.push('/patient-setup');
+        } else {
+            // Caregivers must authenticate first
+            router.push('/login');
+        }
     };
 
     return (
@@ -76,7 +80,7 @@ export default function WelcomeScreen() {
                         role="caregiver"
                         icon={HeartPulse}
                         title="I am a Caregiver"
-                        description="I help patients communicate"
+                        description="I help patients communicate (requires account)"
                         themeColor="#10B981"
                         onPress={() => handleRoleSelection('caregiver')}
                         colors={colors}

@@ -2,18 +2,19 @@ import { Redirect } from 'expo-router';
 import { useRole } from '../contexts/RoleContext';
 
 export default function Index() {
-    const { userRole } = useRole();
+    const { role, patientType } = useRole();
 
     // If no role selected, go to welcome
-    if (!userRole) {
+    if (!role) {
         return <Redirect href="/welcome" />;
     }
 
-    // If role exists, route accordingly
-    if (userRole === 'patient') {
-        return <Redirect href="/phraseboard" />;
+    // If patient but no patient type selected, go to patient setup
+    if (role === 'patient' && !patientType) {
+        return <Redirect href="/patient-setup" />;
     }
 
-    // Default to welcome for now, or caregiver dashboard if implemented
-    return <Redirect href="/welcome" />;
+    // Both patients and caregivers go to home screen
+    // Home screen will show the appropriate dashboard based on role
+    return <Redirect href="/home" />;
 }

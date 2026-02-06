@@ -1,18 +1,21 @@
-import { Activity, Calendar, LayoutGrid, Mic, Settings } from 'lucide-react-native';
+import { useRouter } from 'expo-router';
+import { Activity, Calendar, LayoutGrid, Mic, Settings, Users } from 'lucide-react-native';
 import React from 'react';
-import { Alert, Text, TouchableOpacity, View } from 'react-native';
+import { Text, TouchableOpacity, View } from 'react-native';
+import { useAuth } from '../../contexts/AuthContext';
 import { homeStyles as styles } from '../../styles/index.styles';
 import BigButton from '../BigButton';
 
 interface CaregiverDashboardProps {
-    router: any;
+    router: ReturnType<typeof useRouter>;
     t: any;
     colors: any;
     language: string;
-    setLanguage: (lang: any) => void;
+    setLanguage: (lang: 'en' | 'twi' | 'ga') => void;
 }
 
 export const CaregiverDashboard: React.FC<CaregiverDashboardProps> = ({ router, t, colors, language, setLanguage }) => {
+    const { therapistProfile } = useAuth();
     return (
         <>
             {/* Language Selection - Manual Control for Caregivers */}
@@ -30,11 +33,13 @@ export const CaregiverDashboard: React.FC<CaregiverDashboardProps> = ({ router, 
                                     borderColor: colors.primary
                                 }
                             ]}
+                            activeOpacity={0.7}
                         >
                             <Text style={{
                                 color: language === lang ? '#FFF' : colors.text,
                                 fontWeight: 'bold',
-                                textTransform: 'uppercase'
+                                textTransform: 'uppercase',
+                                letterSpacing: 0.5,
                             }}>
                                 {lang}
                             </Text>
@@ -50,6 +55,32 @@ export const CaregiverDashboard: React.FC<CaregiverDashboardProps> = ({ router, 
                 fullWidth
                 onPress={() => router.push('/transcript')}
             />
+
+            {/* My Patients Section */}
+            <TouchableOpacity
+                style={[styles.card, { backgroundColor: colors.primary, borderColor: colors.primary, marginTop: 20 }]}
+                onPress={() => router.push('/my-patients')}
+                activeOpacity={0.8}
+            >
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                        <View style={{ backgroundColor: 'rgba(255,255,255,0.2)', padding: 12, borderRadius: 12 }}>
+                            <Users size={28} color="#FFFFFF" />
+                        </View>
+                        <View>
+                            <Text style={{ color: '#FFFFFF', fontSize: 20, fontWeight: 'bold', letterSpacing: 0.3 }}>
+                                My Patients
+                            </Text>
+                            <Text style={{ color: 'rgba(255,255,255,0.9)', fontSize: 14, marginTop: 2 }}>
+                                {therapistProfile?.assigned_patients?.length || 0} assigned
+                            </Text>
+                        </View>
+                    </View>
+                    <View style={{ backgroundColor: 'rgba(255,255,255,0.2)', padding: 8, borderRadius: 8 }}>
+                        <Text style={{ color: '#FFFFFF', fontSize: 18, fontWeight: 'bold' }}>→</Text>
+                    </View>
+                </View>
+            </TouchableOpacity>
 
             {/* Management Tools Grid */}
             <View style={styles.grid}>
@@ -69,8 +100,7 @@ export const CaregiverDashboard: React.FC<CaregiverDashboardProps> = ({ router, 
                     icon={Activity}
                     label="View History"
                     onPress={() => {
-                        // Will implement history screen later
-                        Alert.alert('Coming Soon', 'Communication history feature will be available in the next update.');
+                        router.push('/history');
                     }}
                 />
 
