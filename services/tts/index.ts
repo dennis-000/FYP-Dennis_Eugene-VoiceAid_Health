@@ -69,16 +69,27 @@ export const TTSService = {
                 try {
                     const base64data = (reader.result as string).split(',')[1];
 
-                    // Save to a temporary file
-                    const uri = `${documentDirectory}tts_temp.mp3`;
+                    // Save to a temporary file as WAV (matching backend format)
+                    const uri = `${documentDirectory}tts_temp.wav`;
                     await writeAsStringAsync(uri, base64data, {
                         encoding: EncodingType.Base64,
                     });
 
-                    // Play the file
-                    const { sound } = await Audio.Sound.createAsync({ uri });
+                    console.log(`[TTS] Saved audio to ${uri}, playing...`);
+
+                    // Play the WAV file
+                    const { sound } = await Audio.Sound.createAsync(
+                        { uri },
+                        { shouldPlay: true }
+                    );
                     currentSound = sound;
-                    await sound.playAsync();
+
+                    // Log when playback completes
+                    sound.setOnPlaybackStatusUpdate((status) => {
+                        if (status.isLoaded && status.didJustFinish) {
+                            console.log('[TTS] Playback completed');
+                        }
+                    });
                 } catch (innerError) {
                     console.error("[TTS Playback Error - Falling back to Native]", innerError);
                     Speech.speak(text, { ...DEFAULT_OPTIONS, language: 'en-GH' });

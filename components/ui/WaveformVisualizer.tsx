@@ -1,13 +1,5 @@
-import React, { useEffect } from 'react';
-import { StyleSheet, View } from 'react-native';
-import Animated, {
-    Easing,
-    useAnimatedStyle,
-    useSharedValue,
-    withRepeat,
-    withSequence,
-    withTiming,
-} from 'react-native-reanimated';
+import React, { useEffect, useRef } from 'react';
+import { Animated, StyleSheet, View } from 'react-native';
 
 interface WaveformVisualizerProps {
     isActive: boolean;
@@ -21,51 +13,62 @@ export const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
     color = '#6366f1',
 }) => {
     const bars = 5;
-    const barAnimations = Array.from({ length: bars }, () => useSharedValue(0.3));
+    const barAnimations = useRef(
+        Array.from({ length: bars }, () => new Animated.Value(0.3))
+    ).current;
 
     useEffect(() => {
         if (isActive) {
-            barAnimations.forEach((anim, index) => {
-                anim.value = withRepeat(
-                    withSequence(
-                        withTiming(1, {
+            const animations = barAnimations.map((anim, index) =>
+                Animated.loop(
+                    Animated.sequence([
+                        Animated.timing(anim, {
+                            toValue: 1,
                             duration: 400 + index * 100,
-                            easing: Easing.inOut(Easing.ease),
+                            useNativeDriver: false,
                         }),
-                        withTiming(0.3, {
+                        Animated.timing(anim, {
+                            toValue: 0.3,
                             duration: 400 + index * 100,
-                            easing: Easing.inOut(Easing.ease),
-                        })
-                    ),
-                    -1,
-                    false
-                );
-            });
+                            useNativeDriver: false,
+                        }),
+                    ])
+                )
+            );
+
+            animations.forEach(anim => anim.start());
+
+            return () => {
+                animations.forEach(anim => anim.stop());
+            };
         } else {
             barAnimations.forEach((anim) => {
-                anim.value = withTiming(0.3, { duration: 200 });
+                Animated.timing(anim, {
+                    toValue: 0.3,
+                    duration: 200,
+                    useNativeDriver: false,
+                }).start();
             });
         }
     }, [isActive]);
 
     return (
         <View style={styles.container}>
-            {barAnimations.map((anim, index) => {
-                const animatedStyle = useAnimatedStyle(() => ({
-                    height: `${anim.value * 100}%`,
-                }));
-
-                return (
-                    <Animated.View
-                        key={index}
-                        style={[
-                            styles.bar,
-                            { backgroundColor: color },
-                            animatedStyle,
-                        ]}
-                    />
-                );
-            })}
+            {barAnimations.map((anim, index) => (
+                <Animated.View
+                    key={index}
+                    style={[
+                        styles.bar,
+                        { backgroundColor: color },
+                        {
+                            height: anim.interpolate({
+                                inputRange: [0, 1],
+                                outputRange: ['12%', '100%'],
+                            }),
+                        },
+                    ]}
+                />
+            ))}
         </View>
     );
 };

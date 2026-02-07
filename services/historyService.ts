@@ -11,7 +11,7 @@ export interface TranscriptionLog {
 const STORAGE_KEY = 'voiceaid_transcription_logs';
 
 export const HistoryService = {
-  
+
   /**
    * Saves a new transcription log to local storage.
    * Newest logs are prepended to the top of the list.
@@ -27,7 +27,7 @@ export const HistoryService = {
       // Get existing logs
       const existing = await HistoryService.getLogs();
       // Add new one to the top
-      const updated = [newEntry, ...existing]; 
+      const updated = [newEntry, ...existing];
 
       await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
       console.log("[History] Log saved:", newEntry.id);
@@ -59,5 +59,17 @@ export const HistoryService = {
     } catch (e) {
       console.error("[History] Failed to clear logs", e);
     }
+  },
+
+  /**
+   * Alias for addLog - saves transcription to history
+   * For backward compatibility
+   */
+  saveTranscription: async (data: { text: string; detectedLanguage: string; timestamp: string }) => {
+    return HistoryService.addLog({
+      text: data.text,
+      detectedLanguage: data.detectedLanguage,
+      intentCategory: 'General', // Default category
+    });
   }
 };

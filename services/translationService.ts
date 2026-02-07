@@ -47,6 +47,10 @@ export interface Translations {
         welcomeMessage: string;
         readyToHelp: string;
         startConversation: string;
+        batchMode: string;
+        liveMode: string;
+        tapToStartLive: string;
+        tapToStopLive: string;
     };
     common: {
         loading: string;
@@ -97,6 +101,10 @@ const translations: Record<Language, Translations> = {
             welcomeMessage: 'Hello! I\'m ready to help you communicate.',
             readyToHelp: 'Ready to assist',
             startConversation: 'Tap the microphone to start speaking',
+            batchMode: 'Batch',
+            liveMode: 'Live',
+            tapToStartLive: 'Tap to start live transcription',
+            tapToStopLive: 'Tap to stop live transcription',
         },
         common: {
             loading: 'Loading...',
@@ -146,6 +154,10 @@ const translations: Record<Language, Translations> = {
             welcomeMessage: 'Akwaaba! Mepɛ sɛ meboa wo ma wo ne afoforɔ nkasa.',
             readyToHelp: 'Mepɛ sɛ meboa',
             startConversation: 'Mia maikrofon no na fi ase kasa',
+            batchMode: 'Batch',
+            liveMode: 'Live',
+            tapToStartLive: 'Mia na fi ase live transcription',
+            tapToStopLive: 'Mia na gyae live transcription',
         },
         common: {
             loading: 'Ɛrekyerɛ...',
@@ -195,6 +207,10 @@ const translations: Record<Language, Translations> = {
             welcomeMessage: 'Bɔŋɔ Mli! Mi lɛ pɛ kɛ boa wo ma wo kɛ wiemɔ.',
             readyToHelp: 'Mi lɛ pɛ kɛ boa',
             startConversation: 'Mia maikrofon lɛ fi ase kasa',
+            batchMode: 'Batch',
+            liveMode: 'Live',
+            tapToStartLive: 'Mia kɛ fi ase live transcription',
+            tapToStopLive: 'Mia kɛ gyae live transcription',
         },
         common: {
             loading: 'Ɛ lɛ yɛ...',

@@ -16,19 +16,18 @@ import { Audio } from 'expo-av';
  */
 export const ENHANCED_RECORDING_OPTIONS = {
     android: {
-        extension: '.m4a',
-        outputFormat: Audio.AndroidOutputFormat.MPEG_4,
-        audioEncoder: Audio.AndroidAudioEncoder.AAC,
-        sampleRate: 48000, // Higher sample rate for better clarity
-        numberOfChannels: 1, // Mono to reduce file size and processing
+        extension: '.wav',
+        outputFormat: Audio.AndroidOutputFormat.DEFAULT,
+        audioEncoder: Audio.AndroidAudioEncoder.DEFAULT,
+        sampleRate: 16000, // Whisper requirement
+        numberOfChannels: 1, // Mono
         bitRate: 128000,
-        // AAC provides better compression and quality
     },
     ios: {
-        extension: '.m4a',
-        outputFormat: Audio.IOSOutputFormat.MPEG4AAC,
-        audioQuality: Audio.IOSAudioQuality.MAX, // Maximum quality
-        sampleRate: 48000,
+        extension: '.wav',
+        outputFormat: Audio.IOSOutputFormat.LINEARPCM,
+        audioQuality: Audio.IOSAudioQuality.MAX,
+        sampleRate: 16000, // Whisper requirement
         numberOfChannels: 1,
         bitRate: 128000,
         linearPCMBitDepth: 16,

@@ -9,12 +9,12 @@
 
 import { Platform } from 'react-native';
 
-const LOCAL_IP = "10.51.56.99"; // Updated for physical device connection
+const LOCAL_IP = "10.143.17.99"; // Current WiFi IP - updated for physical device
 const ANDROID_EMULATOR = "10.0.2.2";
 const IOS_SIMULATOR = "localhost";
 
 const HOST = Platform.select({
-    android: ANDROID_EMULATOR, // Or LOCAL_IP if testing on physical device
+    android: LOCAL_IP, // Using local IP for physical device
     ios: IOS_SIMULATOR,
     default: "localhost"
 });

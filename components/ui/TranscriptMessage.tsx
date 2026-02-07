@@ -1,7 +1,6 @@
 import { Copy } from 'lucide-react-native';
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import Animated, { FadeInUp } from 'react-native-reanimated';
 
 interface TranscriptMessageProps {
     text: string;
@@ -19,8 +18,7 @@ export const TranscriptMessage: React.FC<TranscriptMessageProps> = ({
     const isUser = type === 'user';
 
     return (
-        <Animated.View
-            entering={FadeInUp.duration(300)}
+        <View
             style={[
                 styles.container,
                 isUser ? styles.userContainer : styles.systemContainer,
@@ -50,7 +48,7 @@ export const TranscriptMessage: React.FC<TranscriptMessageProps> = ({
                     <Copy size={16} color="#6b7280" />
                 </TouchableOpacity>
             )}
-        </Animated.View>
+        </View>
     );
 };
 

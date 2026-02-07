@@ -1,13 +1,13 @@
 /**
  * ==========================================
- * ENHANCED ASR SERVICE (Powered by Groq / Whisper)
+ * ENHANCED ASR SERVICE (Powered by Whisper)
  * ==========================================
- * Advanced features for speech-impaired users:
+ * Uses local Whisper models via FastAPI backend:
+ * - GiftMark/akan-whisper-model for Twi/Akan
+ * - OpenAI Whisper for English
  * - Real-time transcription with auto language detection
  * - Confidence scoring with detailed metrics
- * - Noise reduction preprocessing
  * - Support for Twi, Ga, and English
- * - Enhanced accuracy for unclear speech patterns
  */
 
 import { Platform } from 'react-native';
@@ -21,8 +21,8 @@ import {
 
 import { ENDPOINTS } from '../../constants/config';
 
-// Groq OpenAI-compatible endpoint (REPLACED WITH LOCAL BACKEND)
-// const GROQ_URL = "https://api.groq.com/openai/v1/audio/transcriptions";
+// Using local FastAPI backend with Whisper models
+// Backend endpoint configured in constants/config.ts
 
 export { ASRResponse, SupportedLanguage };
 
@@ -33,11 +33,7 @@ export const ASRService = {
      */
     processAudio: async (uri: string, selectedLang: SupportedLanguage): Promise<ASRResponse> => {
 
-        // Safety Check
-        // if (!GROQ_API_KEY || GROQ_API_KEY.includes("paste_your_key")) {
-        //     console.warn("[ASR Service] ⚠️ No valid Groq API Key found. Using Simulation.");
-        //     return mockFallbackResponse(selectedLang);
-        // }
+        // No API key needed - using local Whisper backend
 
         try {
             console.log(`[ASR Service] 🎤 Processing audio with enhanced ASR...`);
@@ -86,14 +82,14 @@ export const ASRService = {
 
             // 4. Handle Errors
             if (data.error) {
-                console.error("[Groq API Error]", data.error);
-                throw new Error(data.error.message);
+                console.error("[Whisper Backend Error]", data.error);
+                throw new Error(data.error.message || data.error);
             }
 
             const transcription = data.text;
 
             if (!transcription) {
-                throw new Error("No transcription returned from Groq.");
+                throw new Error("No transcription returned from Whisper backend.");
             }
 
             // 5. Enhanced Processing
@@ -136,13 +132,21 @@ export const ASRService = {
             };
 
         } catch (error: any) {
-            console.error("[Groq Connection Failed]", error);
+            console.error("[Whisper Backend Connection Failed]", error);
+            console.error("[ASR Service] Make sure backend is running on", ENDPOINTS.ASR);
             return {
-                text: `Connection Failed: ${error.message}`,
+                text: `Backend Connection Failed: ${error.message}`,
                 detectedLanguage: 'en',
                 confidence: 0,
                 hasNoiseDetected: false
             };
         }
+    },
+
+    /**
+     * Alias for processAudio - for backward compatibility
+     */
+    transcribe: async (uri: string, selectedLang: string): Promise<ASRResponse> => {
+        return ASRService.processAudio(uri, selectedLang as SupportedLanguage);
     }
 };
