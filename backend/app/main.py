@@ -16,9 +16,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-from app.api import asr, tts, asr_stream
+from app.api import asr, tts, asr_stream, transcriptions
 app.include_router(asr.router, prefix="/asr", tags=["ASR"])
 app.include_router(asr_stream.router, prefix="/asr", tags=["ASR Streaming"])
+app.include_router(transcriptions.router, prefix="/transcriptions", tags=["Transcriptions"])
 app.include_router(tts.router, prefix="/tts", tags=["TTS"])
 
 

@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { API_BASE_URL } from '../constants/config';
 
 export interface TranscriptionLog {
   id: string;
@@ -66,10 +67,52 @@ export const HistoryService = {
    * For backward compatibility
    */
   saveTranscription: async (data: { text: string; detectedLanguage: string; timestamp: string }) => {
-    return HistoryService.addLog({
+    // 1. Save locally first (optimistic update)
+    await HistoryService.addLog({
       text: data.text,
       detectedLanguage: data.detectedLanguage,
-      intentCategory: 'General', // Default category
+      intentCategory: 'General',
     });
+
+    // 2. Sync to Backend DB
+    try {
+      // Get user ID from stored session
+      const userSession = await AsyncStorage.getItem('supabase-auth-token');
+
+      // If no session, we can't save to DB (RLS restricted)
+      // But for development/demo, we might want to allow it?
+      // For now, only proceed if we have a session or rely on backend handling logic if needed.
+      // Assuming a valid session structure:
+      let userId: string | null = null;
+      if (userSession) {
+        const session = JSON.parse(userSession);
+        userId = session.user?.id;
+      }
+
+      if (!userId) {
+        console.log("[History] No user session found, skipping DB sync");
+        return;
+      }
+
+      await fetch(`${API_BASE_URL}/transcriptions/save`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          user_id: userId,
+          text: data.text,
+          language: data.detectedLanguage,
+          metadata: {
+            is_live: true,
+            source: 'app_history'
+          }
+        })
+      });
+      console.log("[History] Log synced to DB");
+
+    } catch (e) {
+      console.error("[History] Failed to sync to DB:", e);
+    }
   }
 };

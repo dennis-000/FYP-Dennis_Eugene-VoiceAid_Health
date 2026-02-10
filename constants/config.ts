@@ -9,7 +9,7 @@
 
 import { Platform } from 'react-native';
 
-const LOCAL_IP = "10.143.17.99"; // Current WiFi IP - updated for physical device
+const LOCAL_IP = "10.237.234.99"; // Current WiFi IP - updated for physical device
 const ANDROID_EMULATOR = "10.0.2.2";
 const IOS_SIMULATOR = "localhost";
 

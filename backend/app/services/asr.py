@@ -55,11 +55,19 @@ class ASRService:
         :return: Dict containing transcription and metadata.
         """
         # Determine model based on language
-        if language == "tw":
+        # Normalize language code
+        if language:
+            language = language.lower().strip()
+            
+        is_twi = language in ["tw", "twi", "akan"]
+        
+        if is_twi:
             model_id = MODEL_ID_TWI
-            task_lang = "akan" # Whisper code for Akan if supported, else None allows auto. 
-            # Note: GiftMark model is fine-tuned, might not need explicit lang code if it Overfits to Akan.
-            # But standard whisper expects language codes. 'en' works. 'tw' might fall back.
+            # For Akan model, we might not pass 'language' if it's specialized, 
+            # or pass 'en' if the model was trained to transcribe Twi as English? 
+            # Usually, standard Whisper expects a valid ISO code. 
+            # 'ak' is the code for Akan. 
+            task_lang = "akan" 
         else:
             model_id = MODEL_ID_EN
             task_lang = "english"
@@ -74,14 +82,35 @@ class ASRService:
         gen_kwargs = {}
         if language == "en":
             gen_kwargs["language"] = "english"
+        elif is_twi:
+             # For Akan: Let model detect (it's fine-tuned) or explicitly set
+             # The model config has forced_decoder_ids which override this anyway
+             # But we can add task-specific hints
+             # gen_kwargs["language"] = "akan"  # REMOVED: Invalid Whisper language code
+             
+             # For speech-impaired: allow longer outputs, handle repetitions
+             gen_kwargs["max_new_tokens"] = 256  # Increased from 128 for longer utterances
+             gen_kwargs["repetition_penalty"] = 1.2  # Reduce stuttering artifacts
+        else:
+             # For Auto/Ga/Other: Let Whisper detect language
+             # Multilingual mode with auto-detection
+             pass
         
         # Run inference
         result = pipe(audio_data, generate_kwargs=gen_kwargs)
         
         if not result or 'text' not in result:
-             return {"text": "", "model": model_id}
-            
-        return {"text": result['text'].strip(), "model": model_id}
+             return {"text": "", "model": model_id, "detectedLanguage": language}
+             
+        # Add basic language detection result if available (Whisper returns it in chunks usually)
+        # But pipeline output is just text.
+        transcribed_text = result['text'].strip()
+        
+        # Post-processing for speech-impaired: remove excessive repetition
+        # Example: "k-k-kɔ kɔ" might become "kɔ kɔ" after model, we can further clean
+        # But be careful not to remove legitimate repeated words
+        
+        return {"text": transcribed_text, "model": model_id, "detectedLanguage": language}
 
 # Singleton instance
 asr_service = ASRService()

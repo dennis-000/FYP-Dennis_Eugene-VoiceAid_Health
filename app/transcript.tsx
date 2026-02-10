@@ -91,30 +91,41 @@ export default function TranscriptionScreen() {
   }, []);
 
   // Cleanup recording on unmount
+  // Cleanup recording ONLY on unmount (navigation away)
   useEffect(() => {
     return () => {
-      if (recording) {
-        // Check if recording is still active before attempting to stop
-        recording.getStatusAsync().then(status => {
-          if (status.isRecording || status.isDoneRecording) {
-            recording.stopAndUnloadAsync().catch(() => {
-              // Silently ignore if already stopped
-            });
-          }
-        }).catch(() => {
-          // Silently ignore status check errors
-        });
+      console.log('[TranscriptScreen] Unmounting - cleaning up recording');
+      if (recordingRef.current) {
+        recordingRef.current.stopAndUnloadAsync().catch(() => { });
       }
     };
-  }, [recording]);
+  }, []); // Empty dependency array = runs only on mount/unmount
+
+  // Permission check on mount
+  useEffect(() => {
+    (async () => {
+      try {
+        const { status } = await Audio.requestPermissionsAsync();
+        console.log('[TranscriptScreen] Audio permission status:', status);
+        if (status !== 'granted') {
+          Alert.alert('Permission Required', 'Microphone access is needed for transcription.');
+        }
+      } catch (err) {
+        console.error('[TranscriptScreen] Failed to ask permission:', err);
+      }
+    })();
+  }, []);
 
   const recordingRef = useRef<Audio.Recording | null>(null);
 
   const startRecording = async () => {
+    console.log('[TranscriptScreen] startRecording called');
     try {
       setMeteringLevels([]);
 
+      console.log('[TranscriptScreen] Configuring audio session...');
       await AudioPreprocessingService.configureAudioSession();
+      console.log('[TranscriptScreen] Audio session configured');
 
       const { recording } = await Audio.Recording.createAsync(
         ENHANCED_RECORDING_OPTIONS,
@@ -128,12 +139,13 @@ export default function TranscriptionScreen() {
         }
       );
 
+      console.log('[TranscriptScreen] Recording started successfully');
       setRecording(recording);
       recordingRef.current = recording;
       return recording; // Return for loop usage
     } catch (err) {
       console.error('[Recording Error]', err);
-      Alert.alert('Error', 'Could not start recording');
+      Alert.alert('Error', 'Could not start recording: ' + (err as any).message);
       return null;
     }
   };
@@ -214,7 +226,11 @@ export default function TranscriptionScreen() {
       );
 
       // Start initial recording
-      await startRecording();
+      const rec = await startRecording();
+      if (!rec) {
+        console.error('[Live ASR] Failed to start initial recording');
+        throw new Error('Recording failed to start');
+      }
 
       // Chunk loop (Record -> Stop -> Send -> Delay -> Record)
       const chunkInterval = setInterval(async () => {
@@ -249,7 +265,7 @@ export default function TranscriptionScreen() {
             }
           }
         }
-      }, 3000); // 3-second chunks
+      }, 5000); // 5-second chunks (improved context + less overhead)
 
       // Store interval for cleanup
       (recordingRef as any)._chunkInterval = chunkInterval;
@@ -262,6 +278,7 @@ export default function TranscriptionScreen() {
   };
 
   const stopLiveTranscription = async () => {
+    console.log('[Live ASR] stopLiveTranscription called'); // Stack trace might be noisy in RN, simple log first
     try {
       // Clear interval
       if ((recordingRef as any)._chunkInterval) {
@@ -280,6 +297,11 @@ export default function TranscriptionScreen() {
         setRecording(null);
         recordingRef.current = null;
       }
+
+      // Wait for any pending transcription responses to arrive
+      // This prevents race condition where backend sends results after disconnect
+      console.log('[Live ASR] Waiting for pending responses...');
+      await new Promise(resolve => setTimeout(resolve, 1500));
 
       // Disconnect WebSocket
       streamingASRService.disconnect();
