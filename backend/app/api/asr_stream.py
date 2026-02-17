@@ -74,15 +74,22 @@ async def stream_transcription(websocket: WebSocket):
                     "language": language
                 }
                 
-                await websocket.send_json(response)
-                print(f"[WebSocket] Sent transcription for chunk {chunk_id}: {result['text'][:50]}...")
+                try:
+                    await websocket.send_json(response)
+                    print(f"[WebSocket] ✅ Sent transcription for chunk {chunk_id}: {result['text'][:50]}...")
+                except RuntimeError:
+                    print(f"[WebSocket] ⚠️ Cannot send chunk {chunk_id}, connection closed")
                 
             except Exception as e:
                 print(f"[WebSocket] Error processing chunk {chunk_id}: {str(e)}")
-                await websocket.send_json({
-                    "error": f"Transcription failed: {str(e)}",
-                    "chunk_id": chunk_id
-                })
+                try:
+                    # Try to send error to client, but ignore if closed
+                    await websocket.send_json({
+                        "error": f"Transcription failed: {str(e)}",
+                        "chunk_id": chunk_id
+                    })
+                except:
+                    pass
                 
     except WebSocketDisconnect:
         print("[WebSocket] Client disconnected")
@@ -92,3 +99,4 @@ async def stream_transcription(websocket: WebSocket):
             await websocket.close()
         except:
             pass
+

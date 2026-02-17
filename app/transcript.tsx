@@ -213,7 +213,8 @@ export default function TranscriptionScreen() {
       await streamingASRService.connect(
         language as string,
         (result) => {
-          console.log('[Live ASR] Received:', result.text);
+          console.log('[Live ASR] ✅ RECEIVED TRANSCRIPTION:', result.text);
+          console.log('[Live ASR] Chunk ID:', result.chunkId, 'Model:', result.model);
           setLiveTranscript(prev => prev + ' ' + result.text);
           setTimeout(() => {
             scrollViewRef.current?.scrollToEnd({ animated: true });
@@ -265,7 +266,7 @@ export default function TranscriptionScreen() {
             }
           }
         }
-      }, 5000); // 5-second chunks (improved context + less overhead)
+      }, 2000); // 2-second chunks for smoother real-time experience (speech-impaired friendly)
 
       // Store interval for cleanup
       (recordingRef as any)._chunkInterval = chunkInterval;
@@ -300,8 +301,8 @@ export default function TranscriptionScreen() {
 
       // Wait for any pending transcription responses to arrive
       // This prevents race condition where backend sends results after disconnect
-      console.log('[Live ASR] Waiting for pending responses...');
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      console.log('[Live ASR] Waiting for pending responses (CPU processing)...');
+      await new Promise(resolve => setTimeout(resolve, 10000));
 
       // Disconnect WebSocket
       streamingASRService.disconnect();
@@ -623,3 +624,4 @@ const styles = StyleSheet.create({
     lineHeight: 24,
   },
 });
+

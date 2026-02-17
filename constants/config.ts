@@ -1,25 +1,29 @@
 /**
  * BACKEND API CONFIGURATION
  * 
- * Point this to your FastAPI backend.
- * For Android Emulator: http://10.0.2.2:8000
- * For iOS Simulator: http://localhost:8000
- * For Physical Device: Use your computer's local IP (e.g., http://192.168.1.5:8000)
+ * USING GOOGLE COLAB GPU BACKEND FOR FAST TRANSCRIPTION
+ * This provides 10x faster inference (<1s vs 5-10s on local CPU)
  */
 
-import { Platform } from 'react-native';
 
-const LOCAL_IP = "10.237.234.99"; // Current WiFi IP - updated for physical device
+// Google Colab GPU Backend (via ngrok tunnel)
+const COLAB_NGROK_URL = "https://reticently-laudable-ali.ngrok-free.dev";
+
+// Local backend (for fallback/testing)
+const LOCAL_IP = "192.168.0.125";
 const ANDROID_EMULATOR = "10.0.2.2";
 const IOS_SIMULATOR = "localhost";
 
-const HOST = Platform.select({
-    android: LOCAL_IP, // Using local IP for physical device
-    ios: IOS_SIMULATOR,
-    default: "localhost"
-});
+// Use Colab GPU backend for all platforms
+export const API_BASE_URL = COLAB_NGROK_URL;
 
-export const API_BASE_URL = `http://${HOST}:8000`;
+// Fallback to local backend (uncomment to switch back)
+// const HOST = Platform.select({
+//     android: LOCAL_IP,
+//     ios: IOS_SIMULATOR,
+//     default: "localhost"
+// });
+// export const API_BASE_URL = `http://${HOST}:8000`;
 
 export const ENDPOINTS = {
     ASR: `${API_BASE_URL}/asr/transcribe`,

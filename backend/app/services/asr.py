@@ -79,18 +79,20 @@ class ASRService:
         print(f"Processing audio for transcription (Lang: {language}, Model: {model_id})...")
         
         # Determine generation kwargs
-        gen_kwargs = {}
+        # SPEECH-IMPAIRED OPTIMIZATIONS: Applied to ALL languages
+        gen_kwargs = {
+            "max_new_tokens": 256,  # Allow longer utterances (speech-impaired may speak slower)
+            "repetition_penalty": 1.3,  # Reduce stuttering/repetition artifacts (increased from 1.2)
+            "no_repeat_ngram_size": 3,  # Prevent exact 3-word phrase repetitions
+            "temperature": 0.6,  # Lower temperature for more focused predictions
+        }
+        
         if language == "en":
             gen_kwargs["language"] = "english"
         elif is_twi:
              # For Akan: Let model detect (it's fine-tuned) or explicitly set
              # The model config has forced_decoder_ids which override this anyway
-             # But we can add task-specific hints
-             # gen_kwargs["language"] = "akan"  # REMOVED: Invalid Whisper language code
-             
-             # For speech-impaired: allow longer outputs, handle repetitions
-             gen_kwargs["max_new_tokens"] = 256  # Increased from 128 for longer utterances
-             gen_kwargs["repetition_penalty"] = 1.2  # Reduce stuttering artifacts
+             pass
         else:
              # For Auto/Ga/Other: Let Whisper detect language
              # Multilingual mode with auto-detection
@@ -102,13 +104,43 @@ class ASRService:
         if not result or 'text' not in result:
              return {"text": "", "model": model_id, "detectedLanguage": language}
              
-        # Add basic language detection result if available (Whisper returns it in chunks usually)
-        # But pipeline output is just text.
+        # Get transcribed text
         transcribed_text = result['text'].strip()
         
-        # Post-processing for speech-impaired: remove excessive repetition
-        # Example: "k-k-kɔ kɔ" might become "kɔ kɔ" after model, we can further clean
-        # But be careful not to remove legitimate repeated words
+        # POST-PROCESSING FOR SPEECH-IMPAIRED
+        # Remove excessive repetitions (e.g., "I I I want" -> "I want")
+        import re
+        
+        # Remove single-word repetitions (stuttering)
+        # Pattern: word repeated 2+ times consecutively
+        def remove_stuttering(text):
+            # Match word boundaries to avoid breaking compound words
+            # Example: "I I I want" -> "I want", "k-k-kɔ" -> "kɔ"
+            words = text.split()
+            cleaned_words = []
+            prev_word = None
+            repeat_count = 0
+            
+            for word in words:
+                # Normalize word (remove hyphens, lowercase for comparison)
+                normalized = word.lower().replace('-', '')
+                
+                if normalized == prev_word:
+                    repeat_count += 1
+                    # Only keep first instance of repeated word
+                    continue
+                else:
+                    cleaned_words.append(word)
+                    prev_word = normalized
+                    repeat_count = 0
+            
+            return ' '.join(cleaned_words)
+        
+        # Apply stuttering removal
+        transcribed_text = remove_stuttering(transcribed_text)
+        
+        # Remove excessive punctuation repetitions (e.g., "..." -> ".")
+        transcribed_text = re.sub(r'([.,!?])\1+', r'\1', transcribed_text)
         
         return {"text": transcribed_text, "model": model_id, "detectedLanguage": language}
 

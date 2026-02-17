@@ -60,8 +60,10 @@ export class StreamingASRService {
                 };
 
                 this.ws.onmessage = (event) => {
+                    console.log('[Streaming ASR] 📨 RAW MESSAGE RECEIVED:', event.data);
                     try {
                         const data = JSON.parse(event.data);
+                        console.log('[Streaming ASR] 📦 PARSED DATA:', data);
 
                         if (data.error) {
                             console.error('[Streaming ASR] Error from server:', data.error);
@@ -72,6 +74,7 @@ export class StreamingASRService {
                                 });
                             }
                         } else if (this.onTranscription) {
+                            console.log('[Streaming ASR] 🎯 CALLING onTranscription callback');
                             this.onTranscription({
                                 text: data.text,
                                 chunkId: data.chunk_id,
