@@ -41,6 +41,15 @@ yarn-error.*
 
 app-example
 
-# generated native folders
 /ios
 /android
+
+# Custom ignores for VoiceAid
+.vscode/
+backend/
+admin-dashboard/
+docs/
+Presentation_Materials/
+*.md
+*.apk
+/empty_temp_dir/
