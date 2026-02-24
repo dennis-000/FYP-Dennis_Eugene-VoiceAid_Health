@@ -4,12 +4,12 @@ import { AlertCircle, ArrowLeft, Globe, Mic, Square } from 'lucide-react-native'
 import React, { useContext, useEffect, useState } from 'react';
 import {
   Alert,
-  SafeAreaView,
   ScrollView,
   Text,
   TouchableOpacity,
   View
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppContext } from './_layout';
 
 import { ASRResponse, ASRService } from '../services/asr';

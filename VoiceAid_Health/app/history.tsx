@@ -4,12 +4,12 @@ import React, { useContext, useEffect, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
-    SafeAreaView,
     ScrollView,
     Text,
     TouchableOpacity,
     View
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { HistoryService, TranscriptionLog } from '../services/historyService';
 import { historyStyles as styles } from '../styles/history.styles';
 import { AppContext } from './_layout';

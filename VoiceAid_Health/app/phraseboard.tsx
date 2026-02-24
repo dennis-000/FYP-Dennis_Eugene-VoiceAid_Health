@@ -5,13 +5,13 @@ import {
   Alert,
   Dimensions,
   Modal,
-  SafeAreaView,
   ScrollView,
   Text,
   TextInput,
   TouchableOpacity,
   View
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { CategoryTabs } from '../components/CategoryTabs';
 import { PhraseTile } from '../components/PhraseTile';
 import { CategoryId, Phrase, PhraseService } from '../services/phrase';

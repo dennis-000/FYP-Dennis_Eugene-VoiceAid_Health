@@ -1,11 +1,11 @@
 import { useRouter } from 'expo-router';
 import React, { useContext, useEffect } from 'react';
 import {
-  SafeAreaView,
   ScrollView,
   Text,
   View
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { CaregiverDashboard } from '../components/ui/CaregiverDashboard';
 import { PatientDashboard } from '../components/ui/PatientDashboard';
 import { useRole } from '../contexts/RoleContext';
