@@ -12,17 +12,23 @@ export default function Root({ children }: PropsWithChildren) {
           content="width=device-width, initial-scale=1, shrink-to-fit=no, viewport-fit=cover"
         />
         <ScrollViewStyleReset />
-        <style dangerouslySetInnerHTML={{ __html: responsiveBackground }} />
+        <style dangerouslySetInnerHTML={{ __html: customStyles }} />
       </head>
       <body>{children}</body>
     </html>
   );
 }
 
-const responsiveBackground = `
+const customStyles = `
 body {
   background-color: #fff;
-  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+#root {
+  padding-top: env(safe-area-inset-top, 0px) !important;
+  padding-bottom: env(safe-area-inset-bottom, 0px) !important;
+  padding-left: env(safe-area-inset-left, 0px) !important;
+  padding-right: env(safe-area-inset-right, 0px) !important;
+  box-sizing: border-box !important;
 }
 @media (prefers-color-scheme: dark) {
   body {

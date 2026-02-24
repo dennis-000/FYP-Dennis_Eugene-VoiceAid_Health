@@ -1,7 +1,7 @@
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import React, { createContext, useCallback, useEffect, useState } from 'react';
-import { StatusBar, View } from 'react-native';
+import { Platform, StatusBar, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import AnimatedSplashScreen from '../components/AnimatedSplashScreen';
 import { THEMES, ThemeMode } from '../constants/theme';
@@ -73,7 +73,7 @@ export default function RootLayout() {
           />
 
           {/* Navigation Stack - This separates the Layout from the Screens (Home, etc) */}
-          <View style={{ flex: 1, backgroundColor: colors.bg }}>
+          <View style={{ flex: 1, backgroundColor: colors.bg, paddingTop: Platform.OS === 'web' ? 44 : 0 }}>
             <Stack
               screenOptions={{
                 headerShown: false, // We use custom headers in screens
