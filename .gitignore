@@ -53,3 +53,12 @@ Presentation_Materials/
 *.md
 *.apk
 /empty_temp_dir/
+
+# Dataset - exclude large audio files (upload to Google Drive instead)
+dataset/audio_samples/*.wav
+dataset/audio_samples/*.mp3
+dataset/audio_samples/*.ogg
+# Keep the template CSV and README in git
+!dataset/transcriptions/transcriptions_template.csv
+!dataset/README.md
+
