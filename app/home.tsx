@@ -24,16 +24,16 @@ export default function HomeScreen() {
             <ScrollView contentContainerStyle={styles.scrollContent}>
                 {/* Header */}
                 <View style={styles.header}>
-                    <Text style={[styles.title, { color: colors.text }]}>
+                    <Text style={[styles.headerTitle, { color: colors.text }]}>
                         VoiceAid Health
                     </Text>
                     {role === 'caregiver' && (
-                        <Text style={[styles.subtitle, { color: colors.subText }]}>
+                        <Text style={[{ fontSize: 16, marginTop: 4 }, { color: colors.subText }]}>
                             Caregiver Mode
                         </Text>
                     )}
                     {role === 'patient' && (
-                        <Text style={[styles.subtitle, { color: colors.subText }]}>
+                        <Text style={[{ fontSize: 16, marginTop: 4 }, { color: colors.subText }]}>
                             {patientType === 'hospital' ? 'Hospital Patient' : 'Guest Mode'}
                         </Text>
                     )}
@@ -54,8 +54,6 @@ export default function HomeScreen() {
                 {role === 'caregiver' && (
                     <CaregiverDashboard
                         router={router}
-                        t={t}
-                        colors={colors}
                         language={language}
                         setLanguage={setLanguage}
                     />
