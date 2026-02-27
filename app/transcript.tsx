@@ -12,6 +12,7 @@ import {
   TouchableOpacity,
   View
 } from 'react-native';
+import { LiveTranscriptionDisplay } from '../components/ui/LiveTranscriptionDisplay';
 import { TranscriptMessage } from '../components/ui/TranscriptMessage';
 import { WaveformVisualizer } from '../components/ui/WaveformVisualizer';
 import { useRole } from '../contexts/RoleContext';
@@ -59,6 +60,8 @@ export default function TranscriptionScreen() {
   const [isLiveMode, setIsLiveMode] = useState(true); // Default to live mode
   const [liveTranscript, setLiveTranscript] = useState('');
   const [isStreaming, setIsStreaming] = useState(false);
+  const [connectionState, setConnectionState] = useState<'connecting' | 'connected' | 'error'>('connected');
+  const [errorMessage, setErrorMessage] = useState('');
 
   // Blinking animation for live indicator
   const blinkAnim = useRef(new Animated.Value(1)).current;
@@ -208,11 +211,14 @@ export default function TranscriptionScreen() {
     try {
       setIsStreaming(true);
       setLiveTranscript('');
+      setConnectionState('connecting');
+      setErrorMessage('');
 
       // Connect to WebSocket
       await streamingASRService.connect(
         language as string,
         (result) => {
+          setConnectionState('connected');
           console.log('[Live ASR] ✅ RECEIVED TRANSCRIPTION:', result.text);
           console.log('[Live ASR] Chunk ID:', result.chunkId, 'Model:', result.model);
           setLiveTranscript(prev => prev + ' ' + result.text);
@@ -222,7 +228,9 @@ export default function TranscriptionScreen() {
         },
         (error) => {
           console.error('[Live ASR] Error:', error.error);
-          Alert.alert('Streaming Error', error.error);
+          setConnectionState('error');
+          setErrorMessage(error.error || "Connection lost");
+          Alert.alert('Streaming Error', error.error || "Connection lost");
         }
       );
 
@@ -271,8 +279,10 @@ export default function TranscriptionScreen() {
       // Store interval for cleanup
       (recordingRef as any)._chunkInterval = chunkInterval;
 
-    } catch (error) {
+    } catch (error: any) {
       console.error('[Live ASR] Failed to start:', error);
+      setConnectionState('error');
+      setErrorMessage(error.message || 'Could not connect to live server');
       Alert.alert('Error', 'Could not start live transcription');
       setIsStreaming(false);
     }
@@ -407,12 +417,12 @@ export default function TranscriptionScreen() {
 
         {/* Live Transcript Display */}
         {isStreaming && (
-          <View style={styles.liveTranscriptContainer}>
-            <Text style={styles.liveTranscriptLabel}>Live Transcription:</Text>
-            <Text style={styles.liveTranscriptText}>
-              {liveTranscript || "Listening... (Speak now)"}
-            </Text>
-          </View>
+          <LiveTranscriptionDisplay
+            text={liveTranscript}
+            isStreaming={isStreaming}
+            connectionState={connectionState}
+            errorMessage={errorMessage}
+          />
         )}
 
         {/* Waveform */}
@@ -600,28 +610,6 @@ const styles = StyleSheet.create({
   },
   modeButtonTextActive: {
     color: '#FFFFFF',
-  },
-  liveTranscriptContainer: {
-    width: '100%',
-    backgroundColor: '#eff6ff',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#dbeafe',
-  },
-  liveTranscriptLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#6366f1',
-    marginBottom: 8,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  liveTranscriptText: {
-    fontSize: 16,
-    color: '#111827',
-    lineHeight: 24,
   },
 });
 
