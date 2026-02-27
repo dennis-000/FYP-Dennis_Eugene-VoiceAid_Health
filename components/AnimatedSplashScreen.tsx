@@ -5,19 +5,20 @@ import {
   StyleSheet, 
   Animated, 
   Dimensions, 
-  Easing 
+  Easing,
+  Platform 
 } from 'react-native';
-import { Heart, AudioLines } from 'lucide-react-native'; // New Icons
+import { Heart, AudioLines } from 'lucide-react-native';
 import { THEMES } from '../constants/theme';
 
 const { width } = Dimensions.get('window');
+const useNativeDriver = Platform.OS !== 'web';
 
 interface SplashScreenProps {
   onAnimationFinish: () => void;
 }
 
 export default function AnimatedSplashScreen({ onAnimationFinish }: SplashScreenProps) {
-  // Animation Values
   const fadeAnim = useRef(new Animated.Value(1)).current; 
   const scaleAnim = useRef(new Animated.Value(0.3)).current; 
   const textAnim = useRef(new Animated.Value(0)).current; 
@@ -26,41 +27,39 @@ export default function AnimatedSplashScreen({ onAnimationFinish }: SplashScreen
   const [isAnimationComplete, setIsAnimationComplete] = useState(false);
 
   useEffect(() => {
-    // 1. Start the Pulse Loop
     const pulseLoop = Animated.loop(
       Animated.sequence([
         Animated.timing(pulseAnim, {
           toValue: 1.25,
           duration: 1200,
-          useNativeDriver: true,
+          useNativeDriver,
         }),
         Animated.timing(pulseAnim, {
           toValue: 1,
           duration: 1200,
-          useNativeDriver: true,
+          useNativeDriver,
         }),
       ])
     );
     pulseLoop.start();
 
-    // 2. Main Entrance Sequence
     Animated.sequence([
       Animated.spring(scaleAnim, {
         toValue: 1,
         friction: 6,
         tension: 50,
-        useNativeDriver: true,
+        useNativeDriver,
       }),
       Animated.timing(textAnim, {
         toValue: 1,
         duration: 800,
-        useNativeDriver: true,
+        useNativeDriver,
       }),
       Animated.delay(1500), 
       Animated.timing(fadeAnim, {
         toValue: 0,
         duration: 800,
-        useNativeDriver: true,
+        useNativeDriver,
         easing: Easing.out(Easing.ease)
       })
     ]).start(() => {

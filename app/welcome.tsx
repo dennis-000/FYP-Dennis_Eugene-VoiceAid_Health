@@ -15,10 +15,10 @@ import { HeartPulse, Sparkles, User } from 'lucide-react-native';
 import React, { useContext } from 'react';
 import {
     Dimensions,
-    SafeAreaView,
     Text,
     View
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { RoleSelectionButton } from '../components/RoleSelectionButton';
 import { useRole } from '../contexts/RoleContext';
 import { welcomeStyles as styles } from '../styles/welcome.styles';
