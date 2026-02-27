@@ -38,17 +38,8 @@ export const SettingsRow: React.FC<SettingsRowProps> = ({
     subtitleColor = '#666',
     borderColor = '#E5E7EB'
 }) => {
-    const Container = onPress ? TouchableOpacity : View;
-
-    return (
-        <Container
-            style={[
-                styles.settingRow,
-                showBorderTop && { borderTopWidth: 1, borderTopColor: borderColor }
-            ]}
-            onPress={onPress}
-            disabled={!onPress}
-        >
+    const content = (
+        <>
             <View style={styles.rowLeft}>
                 <View style={[styles.iconBox, { backgroundColor: iconBg }]}>
                     <Icon size={20} color={iconColor} />
@@ -72,6 +63,31 @@ export const SettingsRow: React.FC<SettingsRowProps> = ({
             ) : (
                 rightElement
             )}
-        </Container>
+        </>
+    );
+
+    if (onPress) {
+        return (
+            <TouchableOpacity
+                style={[
+                    styles.settingRow,
+                    showBorderTop && { borderTopWidth: 1, borderTopColor: borderColor }
+                ]}
+                onPress={onPress}
+            >
+                {content}
+            </TouchableOpacity>
+        );
+    }
+
+    return (
+        <View
+            style={[
+                styles.settingRow,
+                showBorderTop && { borderTopWidth: 1, borderTopColor: borderColor }
+            ]}
+        >
+            {content}
+        </View>
     );
 };

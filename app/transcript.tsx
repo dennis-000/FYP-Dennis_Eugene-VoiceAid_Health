@@ -22,6 +22,7 @@ import { AudioPreprocessingService, ENHANCED_RECORDING_OPTIONS } from '../servic
 import { HistoryService } from '../services/historyService';
 import { getTranslationsSync, Language } from '../services/translationService';
 import { TTSService } from '../services/tts';
+import { SupportedTTSLanguage } from '../services/tts/config';
 import { AppContext } from './_layout';
 
 const Header = ({ title, onBack }: { title: string, onBack: () => void }) => {
@@ -79,7 +80,7 @@ export default function TranscriptionScreen() {
 
   const playWelcomeMessage = async () => {
     try {
-      await TTSService.speak(t.transcript.welcomeMessage, language as string);
+      await TTSService.speak(t.transcript.welcomeMessage, language as SupportedTTSLanguage);
     } catch (error) {
       console.log('Could not play welcome message:', error);
     }

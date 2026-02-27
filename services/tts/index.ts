@@ -1,5 +1,5 @@
 import { Audio } from 'expo-av';
-import { documentDirectory, EncodingType, writeAsStringAsync } from 'expo-file-system/legacy';
+import { documentDirectory, EncodingType, writeAsStringAsync } from 'expo-file-system';
 import * as Speech from 'expo-speech';
 import { ENDPOINTS } from '../../constants/config';
 import { DEFAULT_OPTIONS, SupportedTTSLanguage } from './config';
