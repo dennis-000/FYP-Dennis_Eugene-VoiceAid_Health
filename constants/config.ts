@@ -6,8 +6,8 @@
  */
 
 
-// Google Colab GPU Backend (via ngrok tunnel)
-const COLAB_NGROK_URL = "https://reticently-laudable-ali.ngrok-free.dev";
+// Google Colab GPU Backend (via Cloudflare tunnel)
+const COLAB_URL = "https://draft-behavior-screensaver-petersburg.trycloudflare.com";
 
 // Local backend (for fallback/testing)
 const LOCAL_IP = "192.168.0.125";
@@ -15,7 +15,7 @@ const ANDROID_EMULATOR = "10.0.2.2";
 const IOS_SIMULATOR = "localhost";
 
 // Use Colab GPU backend for all platforms
-export const API_BASE_URL = COLAB_NGROK_URL;
+export const API_BASE_URL = COLAB_URL;
 
 // Fallback to local backend (uncomment to switch back)
 // const HOST = Platform.select({
