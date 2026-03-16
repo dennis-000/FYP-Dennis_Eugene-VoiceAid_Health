@@ -4,7 +4,7 @@ import numpy as np
 
 # Model IDs
 MODEL_ID_EN = "openai/whisper-base"
-MODEL_ID_TWI = "GiftMark/akan-whisper-model"
+MODEL_ID_TWI = "dennis-9/whisper-small_Akan_non_standardspeech"
 
 class ASRService:
     def __init__(self):

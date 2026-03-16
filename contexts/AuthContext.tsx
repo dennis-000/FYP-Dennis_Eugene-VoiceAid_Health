@@ -13,6 +13,7 @@ export interface TherapistProfile {
     full_name: string;
     organization?: string;
     specialization?: string;
+    invite_code?: string; // Auto-generated code for assigning patients
     assigned_patients: string[]; // Array of patient IDs
     created_at: string;
     updated_at: string;

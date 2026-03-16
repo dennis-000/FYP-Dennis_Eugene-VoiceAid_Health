@@ -8,6 +8,13 @@
 import { PatientProfile, TherapistProfile } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 
+/**
+ * Generate a 6-character random alphanumeric invite code
+ */
+const generateInviteCode = () => {
+    return Math.random().toString(36).substring(2, 8).toUpperCase();
+};
+
 // ==========================================
 // THERAPIST PROFILE OPERATIONS
 // ==========================================
@@ -35,6 +42,8 @@ export const createTherapistProfile = async (
             specialization
         });
 
+        const inviteCode = generateInviteCode();
+
         const { data, error } = await supabase
             .from('therapist_profiles')
             .insert({
@@ -45,6 +54,7 @@ export const createTherapistProfile = async (
                 organization_id: organizationId,
                 organization_code: organizationCode,
                 specialization,
+                invite_code: inviteCode,
                 assigned_patients: [],
             })
             .select()

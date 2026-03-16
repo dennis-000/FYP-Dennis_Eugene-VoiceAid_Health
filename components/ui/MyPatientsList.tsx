@@ -6,7 +6,7 @@
  */
 
 import { useRouter } from 'expo-router';
-import { Calendar, ChevronRight, User, UserPlus } from 'lucide-react-native';
+import { Activity, Calendar, ChevronRight, User, UserPlus } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
 import {
     ActivityIndicator,
@@ -156,8 +156,30 @@ export const MyPatientsList: React.FC<MyPatientsListProps> = ({
                         </Text>
                     </View>
 
-                    {/* Chevron */}
-                    <ChevronRight size={20} color={colors.subText} />
+                    {/* History Button & Chevron */}
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                        <TouchableOpacity 
+                            style={{
+                                padding: 8,
+                                backgroundColor: colors.primary + '10',
+                                borderRadius: 8,
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                gap: 4
+                            }}
+                            onPress={(e) => {
+                                e.stopPropagation();
+                                router.push({
+                                    pathname: '/patient-history',
+                                    params: { id: patient.id, name: patient.full_name || 'Patient' }
+                                });
+                            }}
+                        >
+                            <Activity size={16} color={colors.primary} />
+                            <Text style={{ fontSize: 12, color: colors.primary, fontWeight: '600' }}>History</Text>
+                        </TouchableOpacity>
+                        <ChevronRight size={20} color={colors.subText} />
+                    </View>
                 </TouchableOpacity>
             ))}
         </ScrollView>

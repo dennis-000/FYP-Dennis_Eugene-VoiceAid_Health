@@ -1,118 +1,170 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { API_BASE_URL } from '../constants/config';
+import { supabase } from '../lib/supabase';
 
 export interface TranscriptionLog {
-  id: string;
-  timestamp: number;
-  text: string;           // The original or refined text
-  intentCategory: string; // e.g., "Pain", "Needs"
-  detectedLanguage: string;
+    id: string;
+    timestamp: number;
+    text: string;
+    intentCategory?: string;
+    detectedLanguage?: string;
+    user_id?: string;
 }
-
-const STORAGE_KEY = 'voiceaid_transcription_logs';
 
 export const HistoryService = {
 
-  /**
-   * Saves a new transcription log to local storage.
-   * Newest logs are prepended to the top of the list.
-   */
-  addLog: async (log: Omit<TranscriptionLog, 'id' | 'timestamp'>) => {
-    try {
-      const newEntry: TranscriptionLog = {
-        id: Math.random().toString(36).substr(2, 9),
-        timestamp: Date.now(),
-        ...log
-      };
+    /**
+     * Saves a new transcription log to Supabase.
+     */
+    addLog: async (log: Omit<TranscriptionLog, 'id' | 'timestamp'>) => {
+        try {
+            // First check if this is a hospital patient, they have a dedicated ID
+            const patientId = await AsyncStorage.getItem('@voiceaid_patient_id');
+            const guestSession = await AsyncStorage.getItem('@voiceaid_role');
 
-      // Get existing logs
-      const existing = await HistoryService.getLogs();
-      // Add new one to the top
-      const updated = [newEntry, ...existing];
+            let userIdToSave = patientId;
 
-      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-      console.log("[History] Log saved:", newEntry.id);
-    } catch (e) {
-      console.error("[History] Failed to save log", e);
+            // If no patient ID but we have a user session from Supabase, use that
+            if (!userIdToSave) {
+                const sessionStr = await AsyncStorage.getItem('supabase-auth-token');
+                if (sessionStr) {
+                    const session = JSON.parse(sessionStr);
+                    userIdToSave = session.user?.id;
+                }
+            }
+
+            const { data, error } = await supabase
+                .from('transcriptions')
+                .insert({
+                    user_id: userIdToSave || 'guest',
+                    text: log.text,
+                    language: log.detectedLanguage || 'en',
+                    metadata: {
+                        intentCategory: log.intentCategory || 'Transcription',
+                        source: 'app_history'
+                    }
+                })
+                .select()
+                .single();
+
+            if (error) throw error;
+            console.log("[History] Log saved to Supabase:", data.id);
+            return data;
+        } catch (e) {
+            console.error("[History] Failed to save log to Supabase", e);
+            throw e;
+        }
+    },
+
+    /**
+     * Retrieves all logs for the current user from Supabase.
+     */
+    getLogs: async (): Promise<TranscriptionLog[]> => {
+        try {
+            const patientId = await AsyncStorage.getItem('@voiceaid_patient_id');
+            let userIdToFetch = patientId;
+
+            if (!userIdToFetch) {
+                const sessionStr = await AsyncStorage.getItem('supabase-auth-token');
+                if (sessionStr) {
+                    const session = JSON.parse(sessionStr);
+                    userIdToFetch = session.user?.id;
+                }
+            }
+
+            if (!userIdToFetch) {
+                console.log("[History] No user ID to fetch logs for");
+                return [];
+            }
+
+            const { data, error } = await supabase
+                .from('transcriptions')
+                .select('*')
+                .eq('user_id', userIdToFetch)
+                .order('created_at', { ascending: false });
+
+            if (error) throw error;
+
+            return data.map(row => ({
+                id: row.id,
+                timestamp: new Date(row.created_at).getTime(),
+                text: row.text,
+                detectedLanguage: row.language,
+                intentCategory: row.metadata?.intentCategory || 'Transcription',
+                user_id: row.user_id
+            }));
+
+        } catch (e) {
+            console.error("[History] Failed to fetch logs from Supabase", e);
+            return [];
+        }
+    },
+
+    /**
+     * Get logs for a specific patient (Used by Therapists in the dashboard)
+     */
+    getPatientLogs: async (patientId: string): Promise<TranscriptionLog[]> => {
+        try {
+            const { data, error } = await supabase
+                .from('transcriptions')
+                .select('*')
+                .eq('user_id', patientId)
+                .order('created_at', { ascending: false });
+
+            if (error) throw error;
+
+            return data.map(row => ({
+                id: row.id,
+                timestamp: new Date(row.created_at).getTime(),
+                text: row.text,
+                detectedLanguage: row.language,
+                intentCategory: row.metadata?.intentCategory || 'Transcription',
+                user_id: row.user_id
+            }));
+
+        } catch (e) {
+            console.error("[History] Failed to fetch patient logs", e);
+            return [];
+        }
+    },
+
+    /**
+     * Clear all logs for current user
+     */
+    clearLogs: async () => {
+        try {
+            const patientId = await AsyncStorage.getItem('@voiceaid_patient_id');
+            let userIdToClear = patientId;
+
+            if (!userIdToClear) {
+                const sessionStr = await AsyncStorage.getItem('supabase-auth-token');
+                if (sessionStr) {
+                    const session = JSON.parse(sessionStr);
+                    userIdToClear = session.user?.id;
+                }
+            }
+
+            if (!userIdToClear) return;
+
+            const { error } = await supabase
+                .from('transcriptions')
+                .delete()
+                .eq('user_id', userIdToClear);
+
+            if (error) throw error;
+            console.log("[History] Supabase logs cleared");
+        } catch (e) {
+            console.error("[History] Failed to clear Supabase logs", e);
+        }
+    },
+
+    /**
+     * Alias for addLog - saves transcription to history
+     */
+    saveTranscription: async (data: { text: string; detectedLanguage: string; timestamp: string }) => {
+        await HistoryService.addLog({
+            text: data.text,
+            detectedLanguage: data.detectedLanguage,
+            intentCategory: 'General',
+        });
     }
-  },
-
-  /**
-   * Retrieves all logs from local storage.
-   */
-  getLogs: async (): Promise<TranscriptionLog[]> => {
-    try {
-      const json = await AsyncStorage.getItem(STORAGE_KEY);
-      return json != null ? JSON.parse(json) : [];
-    } catch (e) {
-      console.error("[History] Failed to fetch logs", e);
-      return [];
-    }
-  },
-
-  /**
-   * Clear all logs (Caregiver function)
-   */
-  clearLogs: async () => {
-    try {
-      await AsyncStorage.removeItem(STORAGE_KEY);
-      console.log("[History] Logs cleared");
-    } catch (e) {
-      console.error("[History] Failed to clear logs", e);
-    }
-  },
-
-  /**
-   * Alias for addLog - saves transcription to history
-   * For backward compatibility
-   */
-  saveTranscription: async (data: { text: string; detectedLanguage: string; timestamp: string }) => {
-    // 1. Save locally first (optimistic update)
-    await HistoryService.addLog({
-      text: data.text,
-      detectedLanguage: data.detectedLanguage,
-      intentCategory: 'General',
-    });
-
-    // 2. Sync to Backend DB
-    try {
-      // Get user ID from stored session
-      const userSession = await AsyncStorage.getItem('supabase-auth-token');
-
-      // If no session, we can't save to DB (RLS restricted)
-      // But for development/demo, we might want to allow it?
-      // For now, only proceed if we have a session or rely on backend handling logic if needed.
-      // Assuming a valid session structure:
-      let userId: string | null = null;
-      if (userSession) {
-        const session = JSON.parse(userSession);
-        userId = session.user?.id;
-      }
-
-      if (!userId) {
-        console.log("[History] No user session found, skipping DB sync");
-        return;
-      }
-
-      await fetch(`${API_BASE_URL}/transcriptions/save`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          user_id: userId,
-          text: data.text,
-          language: data.detectedLanguage,
-          metadata: {
-            is_live: true,
-            source: 'app_history'
-          }
-        })
-      });
-      console.log("[History] Log synced to DB");
-
-    } catch (e) {
-      console.error("[History] Failed to sync to DB:", e);
-    }
-  }
 };

@@ -1,8 +1,9 @@
+import * as Clipboard from 'expo-clipboard';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import { Activity, Calendar, ChevronRight, Globe, LayoutGrid, Mic, Settings, Users } from 'lucide-react-native';
+import { Activity, Calendar, ChevronRight, Copy, Globe, LayoutGrid, Mic, Settings, UserPlus, Users } from 'lucide-react-native';
 import React from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useAuth } from '../../contexts/AuthContext';
 import { getLanguageFlag, getTranslationsSync, Language } from '../../services/translationService';
 
@@ -20,6 +21,13 @@ export const CaregiverDashboard: React.FC<CaregiverDashboardProps> = ({
     const { therapistProfile } = useAuth();
     const t = getTranslationsSync(language as Language);
     const patientCount = therapistProfile?.assigned_patients?.length || 0;
+
+    const codeToCopy = therapistProfile?.invite_code || "GEN-1234";
+
+    const copyToClipboard = async () => {
+        await Clipboard.setStringAsync(codeToCopy);
+        Alert.alert('Copied!', 'Patient Invite Code has been copied to your clipboard.');
+    };
 
     return (
         <View style={styles.container}>
@@ -110,6 +118,24 @@ export const CaregiverDashboard: React.FC<CaregiverDashboardProps> = ({
                         <ChevronRight size={20} color="#9ca3af" />
                     </View>
                 </TouchableOpacity>
+
+                {/* Patient Invite Code */}
+                <View style={[styles.card, { borderColor: '#e0e7ff', borderWidth: 1 }]}>
+                    <View style={styles.cardHeader}>
+                        <UserPlus size={18} color="#6366f1" />
+                        <Text style={styles.cardTitle}>Patient Invite Code</Text>
+                    </View>
+                    <Text style={{ fontSize: 13, color: '#6b7280', marginBottom: 12 }}>
+                        Share this 6-digit code with your patients to link their app to your dashboard.
+                    </Text>
+                    <View style={styles.codeContainer}>
+                        <Text style={styles.codeText}>{codeToCopy}</Text>
+                        <TouchableOpacity style={styles.copyButton} activeOpacity={0.7} onPress={copyToClipboard}>
+                            <Copy size={16} color="#FFFFFF" />
+                            <Text style={styles.copyButtonText}>Copy</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
 
                 {/* Management Tools */}
                 <View style={styles.section}>
@@ -261,6 +287,37 @@ const styles = StyleSheet.create({
         fontSize: 18,
         fontWeight: '700',
         color: '#111827',
+    },
+
+    // Invite Code
+    codeContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        backgroundColor: '#f3f4f6',
+        borderRadius: 12,
+        padding: 4,
+        paddingLeft: 16,
+    },
+    codeText: {
+        fontSize: 20,
+        fontWeight: 'bold',
+        color: '#111827',
+        letterSpacing: 2,
+    },
+    copyButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#6366f1',
+        paddingHorizontal: 16,
+        paddingVertical: 10,
+        borderRadius: 10,
+        gap: 6,
+    },
+    copyButtonText: {
+        color: '#FFFFFF',
+        fontWeight: '600',
+        fontSize: 14,
     },
 
     // Language Selector

@@ -27,12 +27,15 @@ export default function PatientSetupScreen() {
     const { setRole, setPatientType } = useRole();
 
     const handlePatientTypeSelection = async (type: 'guest' | 'hospital') => {
-        // Set both role and patient type
-        await setRole('patient');
-        await setPatientType(type);
-
-        // Navigate to home screen which will redirect appropriately
-        router.replace('/');
+        if (type === 'hospital') {
+            // Navigate to the invite code screen
+            router.push('/hospital-connect');
+        } else {
+            // Set both role and patient type immediately for guest users
+            await setRole('patient');
+            await setPatientType(type);
+            router.replace('/');
+        }
     };
 
     const handleBack = () => {

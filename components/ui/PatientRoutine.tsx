@@ -58,7 +58,7 @@ export const PatientRoutine = () => {
     const totalCount = tasks.length;
 
     return (
-        <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]}>
+        <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]} edges={['top', 'bottom']}>
             {/* Header */}
             <View style={[styles.header, { backgroundColor: colors.bg, borderBottomColor: colors.border }]}>
                 <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
@@ -70,7 +70,7 @@ export const PatientRoutine = () => {
 
             <ScrollView contentContainerStyle={styles.content}>
                 {/* Progress Card */}
-                <View style={[styles.progressCard, { backgroundColor: colors.card }]}>
+                <View style={[styles.progressCard, { backgroundColor: colors.card, borderColor: colors.border, borderWidth: 1 }]}>
                     <View style={{ flex: 1 }}>
                         <Text style={[styles.progressTitle, { color: colors.text }]}>
                             Today's Progress
@@ -118,7 +118,7 @@ export const PatientRoutine = () => {
                 </View>
 
                 {/* Help Text */}
-                <View style={[styles.helpCard, { backgroundColor: colors.card }]}>
+                <View style={[styles.helpCard, { backgroundColor: colors.card, borderColor: colors.border, borderWidth: 1 }]}>
                     <Text style={[styles.helpText, { color: colors.subText }]}>
                         💡 Tap any task to mark it as complete
                     </Text>
