@@ -1,6 +1,7 @@
 import { useRouter } from 'expo-router';
 import React, { useContext } from 'react';
-import { SafeAreaView, ScrollView, Text, View } from 'react-native';
+import { ScrollView, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { CaregiverDashboard } from '../components/ui/CaregiverDashboard';
 import { PatientDashboard } from '../components/ui/PatientDashboard';
 import { useRole } from '../contexts/RoleContext';
@@ -9,7 +10,7 @@ import { AppContext } from './_layout';
 
 export default function HomeScreen() {
     const router = useRouter();
-    const { colors, language, setLanguage } = useContext(AppContext);
+    const { colors, language, setLanguage, largeText } = useContext(AppContext);
     const { role, patientType } = useRole();
 
     // Translation helper (simplified for now)
@@ -47,6 +48,7 @@ export default function HomeScreen() {
                         language={language}
                         setLanguage={setLanguage}
                         patientType={patientType}
+                        largeText={largeText}
                     />
                 )}
 
@@ -54,8 +56,10 @@ export default function HomeScreen() {
                 {role === 'caregiver' && (
                     <CaregiverDashboard
                         router={router}
+                        colors={colors}
                         language={language}
                         setLanguage={setLanguage}
+                        largeText={largeText}
                     />
                 )}
             </ScrollView>

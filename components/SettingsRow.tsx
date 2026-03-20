@@ -15,6 +15,7 @@ interface SettingsRowProps {
     activeTrackColor?: string;
     rightElement?: React.ReactNode;
     showBorderTop?: boolean;
+    largeText?: boolean;
 
     // Theme Colors
     titleColor?: string;
@@ -34,20 +35,23 @@ export const SettingsRow: React.FC<SettingsRowProps> = ({
     activeTrackColor,
     rightElement,
     showBorderTop = false,
+    largeText = false,
     titleColor = '#000',
     subtitleColor = '#666',
     borderColor = '#E5E7EB'
 }) => {
+    const scale = largeText ? 1.25 : 1;
+
     const content = (
         <>
             <View style={styles.rowLeft}>
-                <View style={[styles.iconBox, { backgroundColor: iconBg }]}>
-                    <Icon size={20} color={iconColor} />
+                <View style={[styles.iconBox, { backgroundColor: iconBg, width: 40 * scale, height: 40 * scale, borderRadius: 20 * scale }]}>
+                    <Icon size={20 * scale} color={iconColor} />
                 </View>
                 <View style={{ flex: 1, paddingRight: 10 }}>
-                    <Text style={[styles.settingLabel, { color: titleColor }]}>{title}</Text>
+                    <Text style={[styles.settingLabel, { color: titleColor, fontSize: 16 * scale }]}>{title}</Text>
                     {subtitle && (
-                        <Text style={[styles.settingSub, { color: subtitleColor }]}>
+                        <Text style={[styles.settingSub, { color: subtitleColor, fontSize: 14 * scale }]}>
                             {subtitle}
                         </Text>
                     )}

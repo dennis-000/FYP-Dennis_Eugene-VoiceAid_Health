@@ -19,12 +19,21 @@ export const AppContext = createContext<{
   setLanguage: (lang: string) => void;
   colors: typeof THEMES['light'];
   userRole: UserRole;
+  largeText: boolean;
+  setLargeText: (val: boolean) => void;
+  ttsSpeed: 'slow' | 'normal' | 'fast';
+  setTtsSpeed: (val: 'slow' | 'normal' | 'fast') => void;
+  reduceMotion: boolean;
+  setReduceMotion: (val: boolean) => void;
 }>({} as any);
 
 // Wrapper Layout
 export default function RootLayout() {
   const [themeMode, setThemeMode] = useState<ThemeMode>('light');
   const [language, setLanguage] = useState<string>('en');
+  const [largeText, setLargeText] = useState(false);
+  const [ttsSpeed, setTtsSpeed] = useState<'slow' | 'normal' | 'fast'>('normal');
+  const [reduceMotion, setReduceMotion] = useState(false);
   const [appIsReady, setAppIsReady] = useState(false);
 
   const toggleTheme = () => {
@@ -59,7 +68,10 @@ export default function RootLayout() {
   return (
     <AuthProvider>
       <RoleProvider>
-        <AppContext.Provider value={{ themeMode, toggleTheme, language, setLanguage, colors, userRole: 'caregiver' }}>
+        <AppContext.Provider value={{ 
+          themeMode, toggleTheme, language, setLanguage, colors, userRole: 'caregiver',
+          largeText, setLargeText, ttsSpeed, setTtsSpeed, reduceMotion, setReduceMotion
+        }}>
           <SafeAreaProvider onLayout={onLayoutRootView}>
             <StatusBar
               barStyle={themeMode === 'high-contrast' ? 'light-content' : 'dark-content'}
@@ -93,9 +105,14 @@ function AppNavigation() {
         <Stack.Screen name="login" />
         <Stack.Screen name="transcript" />
         <Stack.Screen name="phraseboard" />
-        <Stack.Screen name="routine" />
+        <Stack.Screen name="journal" />
         <Stack.Screen name="settings" />
         <Stack.Screen name="history" />
+        <Stack.Screen name="hospital-connect" />
+        <Stack.Screen name="my-patients" />
+        <Stack.Screen name="patient-detail" />
+        <Stack.Screen name="my-assignments" />
+        <Stack.Screen name="patient-history" />
       </Stack>
 
       {showSplash && (

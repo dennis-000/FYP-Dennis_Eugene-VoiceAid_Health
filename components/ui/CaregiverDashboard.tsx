@@ -8,16 +8,21 @@ import { useAuth } from '../../contexts/AuthContext';
 import { getLanguageFlag, getTranslationsSync, Language } from '../../services/translationService';
 
 interface CaregiverDashboardProps {
-    router: ReturnType<typeof useRouter>;
+    router: any;
+    colors?: any;
     language: string;
-    setLanguage: (lang: 'en' | 'twi' | 'ga') => void;
+    setLanguage: (lang: string) => void;
+    largeText?: boolean;
 }
 
 export const CaregiverDashboard: React.FC<CaregiverDashboardProps> = ({
     router,
+    colors,
     language,
-    setLanguage
+    setLanguage,
+    largeText = false
 }) => {
+    const scale = largeText ? 1.25 : 1;
     const { therapistProfile } = useAuth();
     const t = getTranslationsSync(language as Language);
     const patientCount = therapistProfile?.assigned_patients?.length || 0;
@@ -30,7 +35,7 @@ export const CaregiverDashboard: React.FC<CaregiverDashboardProps> = ({
     };
 
     return (
-        <View style={styles.container}>
+        <View style={[styles.container, { backgroundColor: colors?.bg }]}>
             <ScrollView
                 style={styles.scrollView}
                 contentContainerStyle={styles.scrollContent}
@@ -39,8 +44,8 @@ export const CaregiverDashboard: React.FC<CaregiverDashboardProps> = ({
                 {/* Header */}
                 <View style={styles.header}>
                     <View>
-                        <Text style={styles.welcomeText}>{t.dashboard.welcome}</Text>
-                        <Text style={styles.nameText}>{therapistProfile?.full_name || 'Therapist'}</Text>
+                        <Text style={[styles.welcomeText, { color: colors?.subText, fontSize: 16 * scale }]}>Therapist Dashboard</Text>
+                        <Text style={[styles.nameText, { color: colors?.text, fontSize: 28 * scale }]}>{therapistProfile?.full_name || 'Therapist'}</Text>
                     </View>
                     {therapistProfile?.organization && (
                         <View style={styles.orgBadge}>
@@ -94,8 +99,8 @@ export const CaregiverDashboard: React.FC<CaregiverDashboardProps> = ({
                             <Mic size={28} color="#FFFFFF" strokeWidth={2.5} />
                         </View>
                         <View style={styles.primaryContent}>
-                            <Text style={styles.primaryTitle}>{t.actions.speak}</Text>
-                            <Text style={styles.primarySubtitle}>Start voice assistance</Text>
+                            <Text style={[styles.primaryTitle, { fontSize: 22 * scale }]}>My Patients</Text>
+                            <Text style={[styles.primarySubtitle, { fontSize: 14 * scale }]}>Manage assignments & view history</Text>
                         </View>
                         <ChevronRight size={24} color="rgba(255,255,255,0.8)" />
                     </LinearGradient>
@@ -137,9 +142,9 @@ export const CaregiverDashboard: React.FC<CaregiverDashboardProps> = ({
                     </View>
                 </View>
 
-                {/* Management Tools */}
+                {/* Quick Actions Grid */}
                 <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>{t.dashboard.managementTools}</Text>
+                    <Text style={[styles.sectionTitle, { color: colors?.text, fontSize: 18 * scale }]}>Quick Actions</Text>
 
                     <View style={styles.toolsGrid}>
                         <TouchableOpacity
@@ -147,21 +152,10 @@ export const CaregiverDashboard: React.FC<CaregiverDashboardProps> = ({
                             activeOpacity={0.8}
                             style={styles.toolCard}
                         >
-                            <View style={[styles.toolIcon, { backgroundColor: '#eff6ff' }]}>
+                            <View style={[styles.toolIcon, { backgroundColor: '#f0fdf4' }]}>
                                 <LayoutGrid size={24} color="#3b82f6" strokeWidth={2} />
                             </View>
-                            <Text style={styles.toolText}>{t.actions.phrases}</Text>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity
-                            onPress={() => router.push('/routine')}
-                            activeOpacity={0.8}
-                            style={styles.toolCard}
-                        >
-                            <View style={[styles.toolIcon, { backgroundColor: '#f0fdf4' }]}>
-                                <Calendar size={24} color="#22c55e" strokeWidth={2} />
-                            </View>
-                            <Text style={styles.toolText}>{t.actions.routine}</Text>
+                            <Text style={[styles.toolText, { color: colors?.text, fontSize: 15 * scale }]}>Assignments</Text>
                         </TouchableOpacity>
 
                         <TouchableOpacity

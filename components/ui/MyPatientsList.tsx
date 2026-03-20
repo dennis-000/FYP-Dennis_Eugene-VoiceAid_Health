@@ -6,7 +6,7 @@
  */
 
 import { useRouter } from 'expo-router';
-import { Activity, Calendar, ChevronRight, User, UserPlus } from 'lucide-react-native';
+import { Activity, Calendar, ChevronRight, MessageSquare, User, UserPlus } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
 import {
     ActivityIndicator,
@@ -114,74 +114,91 @@ export const MyPatientsList: React.FC<MyPatientsListProps> = ({
             </View>
 
             {/* Patient Cards */}
-            {patients.map((patient, index) => (
-                <TouchableOpacity
-                    key={patient.id}
-                    style={[
-                        styles.patientCard,
-                        {
-                            backgroundColor: colors.card,
-                            borderColor: colors.border,
-                            marginTop: index === 0 ? 0 : 12
-                        }
-                    ]}
-                    onPress={() => handlePatientPress(patient)}
-                    activeOpacity={0.7}
-                >
-                    {/* Patient Icon */}
-                    <View style={[styles.iconContainer, { backgroundColor: colors.primary + '20' }]}>
-                        <User size={24} color={colors.primary} />
-                    </View>
-
-                    {/* Patient Info */}
-                    <View style={styles.patientInfo}>
-                        <Text style={[styles.patientName, { color: colors.text }]}>
-                            {patient.full_name || 'Unnamed Patient'}
-                        </Text>
-                        <View style={styles.patientMeta}>
-                            <View style={[styles.badge, { backgroundColor: colors.primary + '20' }]}>
-                                <Text style={[styles.badgeText, { color: colors.primary }]}>
-                                    {patient.patient_type === 'hospital' ? 'Hospital' : 'Guest'}
-                                </Text>
+            {patients.map((patient, index) => {
+                const patientCode = (patient as any).patient_code;
+                return (
+                    <TouchableOpacity
+                        key={patient.id}
+                        style={[
+                            styles.patientCard,
+                            {
+                                backgroundColor: colors.card,
+                                borderColor: colors.border,
+                                marginTop: index === 0 ? 0 : 12,
+                            }
+                        ]}
+                        onPress={() => handlePatientPress(patient)}
+                        activeOpacity={0.7}
+                    >
+                        {/* Top Row: Avatar + Info + Code */}
+                        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
+                            {/* Avatar */}
+                            <View style={[styles.iconContainer, { backgroundColor: colors.primary + '20' }]}>
+                                <User size={22} color={colors.primary} />
                             </View>
-                            {patient.hospital_id && (
-                                <Text style={[styles.hospitalId, { color: colors.subText }]}>
-                                    ID: {patient.hospital_id}
+
+                            {/* Name & type */}
+                            <View style={{ flex: 1, marginLeft: 12 }}>
+                                <Text style={[styles.patientName, { color: colors.text }]} numberOfLines={1}>
+                                    {patient.full_name || 'Unnamed Patient'}
                                 </Text>
+                                <View style={[styles.badge, { backgroundColor: colors.primary + '15', alignSelf: 'flex-start', marginTop: 4 }]}>
+                                    <Text style={[styles.badgeText, { color: colors.primary }]}>
+                                        {patient.patient_type === 'hospital' ? '🏥 Hospital' : '👤 Guest'}
+                                    </Text>
+                                </View>
+                            </View>
+
+                            {/* PAT Code — prominent top-right */}
+                            {patientCode ? (
+                                <View style={styles.patCodeBadge}>
+                                    <Text style={styles.patCodeLabel}>Patient ID</Text>
+                                    <Text style={styles.patCodeText}>{patientCode}</Text>
+                                </View>
+                            ) : (
+                                <ChevronRight size={20} color={colors.subText} />
                             )}
                         </View>
-                        <Text style={[styles.patientDate, { color: colors.subText }]}>
-                            <Calendar size={12} color={colors.subText} />
-                            {' '}Added {new Date(patient.created_at).toLocaleDateString()}
-                        </Text>
-                    </View>
 
-                    {/* History Button & Chevron */}
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                        <TouchableOpacity 
-                            style={{
-                                padding: 8,
-                                backgroundColor: colors.primary + '10',
-                                borderRadius: 8,
-                                flexDirection: 'row',
-                                alignItems: 'center',
-                                gap: 4
-                            }}
-                            onPress={(e) => {
-                                e.stopPropagation();
-                                router.push({
-                                    pathname: '/patient-history',
-                                    params: { id: patient.id, name: patient.full_name || 'Patient' }
-                                });
-                            }}
-                        >
-                            <Activity size={16} color={colors.primary} />
-                            <Text style={{ fontSize: 12, color: colors.primary, fontWeight: '600' }}>History</Text>
-                        </TouchableOpacity>
-                        <ChevronRight size={20} color={colors.subText} />
-                    </View>
-                </TouchableOpacity>
-            ))}
+                        {/* Divider */}
+                        <View style={{ height: 1, backgroundColor: colors.border, marginBottom: 10 }} />
+
+                        {/* Bottom Row: Date + Action Buttons */}
+                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <Text style={[styles.patientDate, { color: colors.subText }]}>
+                                <Calendar size={12} color={colors.subText} />
+                                {' '}Added {new Date(patient.created_at).toLocaleDateString()}
+                            </Text>
+
+                            <View style={{ flexDirection: 'row', gap: 8 }}>
+                                {/* Phrases Button */}
+                                <TouchableOpacity
+                                    style={[styles.actionBtn, { backgroundColor: '#eff6ff' }]}
+                                    onPress={(e) => {
+                                        e.stopPropagation();
+                                        router.push({ pathname: '/phraseboard', params: { patientId: patient.id } });
+                                    }}
+                                >
+                                    <MessageSquare size={14} color="#3b82f6" />
+                                    <Text style={[styles.actionBtnText, { color: '#3b82f6' }]}>Phrases</Text>
+                                </TouchableOpacity>
+
+                                {/* History Button */}
+                                <TouchableOpacity
+                                    style={[styles.actionBtn, { backgroundColor: colors.primary + '15' }]}
+                                    onPress={(e) => {
+                                        e.stopPropagation();
+                                        router.push({ pathname: '/patient-history', params: { id: patient.id, name: patient.full_name || 'Patient' } });
+                                    }}
+                                >
+                                    <Activity size={14} color={colors.primary} />
+                                    <Text style={[styles.actionBtnText, { color: colors.primary }]}>History</Text>
+                                </TouchableOpacity>
+                            </View>
+                        </View>
+                    </TouchableOpacity>
+                );
+            })}
         </ScrollView>
     );
 };
@@ -240,8 +257,6 @@ const styles = StyleSheet.create({
         fontSize: 16,
     },
     patientCard: {
-        flexDirection: 'row',
-        alignItems: 'center',
         padding: 16,
         borderRadius: 16,
         borderWidth: 1,
@@ -289,7 +304,43 @@ const styles = StyleSheet.create({
         fontSize: 12,
     },
     patientDate: {
-        fontSize: 13,
+        fontSize: 12,
         marginTop: 2,
+    },
+    patCodeBadge: {
+        alignItems: 'center',
+        backgroundColor: '#fdf4ff',
+        borderRadius: 10,
+        borderWidth: 1,
+        borderColor: '#e9d5ff',
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        minWidth: 72,
+    },
+    patCodeLabel: {
+        fontSize: 9,
+        fontWeight: '600',
+        color: '#a855f7',
+        textTransform: 'uppercase',
+        letterSpacing: 0.8,
+        marginBottom: 2,
+    },
+    patCodeText: {
+        fontSize: 14,
+        fontWeight: '900',
+        color: '#7c3aed',
+        letterSpacing: 1.5,
+    },
+    actionBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 5,
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        borderRadius: 8,
+    },
+    actionBtnText: {
+        fontSize: 12,
+        fontWeight: '700',
     },
 });

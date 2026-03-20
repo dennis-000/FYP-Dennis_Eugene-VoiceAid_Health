@@ -9,13 +9,12 @@ import { useRouter } from 'expo-router';
 import { ArrowLeft } from 'lucide-react-native';
 import React, { useContext } from 'react';
 import {
-    Alert,
-    SafeAreaView,
     StyleSheet,
     Text,
     TouchableOpacity,
     View
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { MyPatientsList } from '../components/ui/MyPatientsList';
 import { PatientProfile, useAuth } from '../contexts/AuthContext';
 import { AppContext } from './_layout';
@@ -26,13 +25,14 @@ export default function MyPatientsScreen() {
     const { therapistProfile } = useAuth();
 
     const handlePatientSelect = (patient: PatientProfile) => {
-        Alert.alert(
-            patient.full_name || 'Patient',
-            `Patient ID: ${patient.id}\nType: ${patient.patient_type}\nAdded: ${new Date(patient.created_at).toLocaleDateString()}`,
-            [
-                { text: 'OK' }
-            ]
-        );
+        router.push({
+            pathname: '/patient-detail',
+            params: {
+                id: patient.id,
+                name: patient.full_name || 'Patient',
+                type: patient.patient_type,
+            }
+        });
     };
 
     if (!therapistProfile) {

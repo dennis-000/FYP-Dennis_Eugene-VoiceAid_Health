@@ -19,7 +19,6 @@ export interface TherapistProfile {
     updated_at: string;
 }
 
-// Patient Profile
 export interface PatientProfile {
     id: string;
     user_id?: string; // Optional - null for guest patients
@@ -27,6 +26,7 @@ export interface PatientProfile {
     therapist_id?: string; // null for guests
     full_name?: string;
     hospital_id?: string;
+    patient_code?: string; // Human-readable ID, e.g. PAT-4829
     created_at: string;
     updated_at: string;
 }

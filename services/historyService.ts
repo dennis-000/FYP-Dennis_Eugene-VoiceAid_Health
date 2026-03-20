@@ -37,11 +37,7 @@ export const HistoryService = {
                 .insert({
                     user_id: userIdToSave || 'guest',
                     text: log.text,
-                    language: log.detectedLanguage || 'en',
-                    metadata: {
-                        intentCategory: log.intentCategory || 'Transcription',
-                        source: 'app_history'
-                    }
+                    language: log.detectedLanguage || 'en'
                 })
                 .select()
                 .single();
@@ -89,7 +85,7 @@ export const HistoryService = {
                 timestamp: new Date(row.created_at).getTime(),
                 text: row.text,
                 detectedLanguage: row.language,
-                intentCategory: row.metadata?.intentCategory || 'Transcription',
+                intentCategory: 'Transcription',
                 user_id: row.user_id
             }));
 
@@ -117,7 +113,7 @@ export const HistoryService = {
                 timestamp: new Date(row.created_at).getTime(),
                 text: row.text,
                 detectedLanguage: row.language,
-                intentCategory: row.metadata?.intentCategory || 'Transcription',
+                intentCategory: 'Transcription',
                 user_id: row.user_id
             }));
 

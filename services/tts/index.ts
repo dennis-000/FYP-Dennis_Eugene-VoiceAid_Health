@@ -20,14 +20,17 @@ export const TTSService = {
     /**
      * Speaks the text using the best available engine.
      */
-    speak: async (text: string, language: SupportedTTSLanguage = 'en') => {
+    speak: async (text: string, language: SupportedTTSLanguage = 'en', options?: { rate?: number }) => {
         // 1. Stop any current audio
         await TTSService.stop();
+
+        const rate = options?.rate || 1.0;
 
         // 2. STRATEGY A: Native TTS for English
         if (language === 'en') {
             Speech.speak(text, {
                 ...DEFAULT_OPTIONS,
+                rate,
                 language: 'en-US',
             });
             return;
@@ -80,7 +83,7 @@ export const TTSService = {
                     // Play the WAV file
                     const { sound } = await Audio.Sound.createAsync(
                         { uri },
-                        { shouldPlay: true }
+                        { shouldPlay: true, rate, shouldCorrectPitch: true }
                     );
                     currentSound = sound;
 
@@ -92,7 +95,7 @@ export const TTSService = {
                     });
                 } catch (innerError) {
                     console.error("[TTS Playback Error - Falling back to Native]", innerError);
-                    Speech.speak(text, { ...DEFAULT_OPTIONS, language: 'en-GH' });
+                    Speech.speak(text, { ...DEFAULT_OPTIONS, rate, language: 'en-GH' });
                 }
             };
 
@@ -100,7 +103,7 @@ export const TTSService = {
             console.error("[TTS API Error - Falling back to Native]", error);
 
             // FALLBACK 1: API Request failed
-            Speech.speak(text, { ...DEFAULT_OPTIONS, language: 'en-GH' });
+            Speech.speak(text, { ...DEFAULT_OPTIONS, rate, language: 'en-GH' });
         }
     },
 

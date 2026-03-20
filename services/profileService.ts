@@ -15,6 +15,14 @@ const generateInviteCode = () => {
     return Math.random().toString(36).substring(2, 8).toUpperCase();
 };
 
+/**
+ * Generate a human-readable patient code, e.g. PAT-4829
+ */
+const generatePatientCode = () => {
+    const digits = Math.floor(1000 + Math.random() * 9000); // always 4 digits
+    return `PAT-${digits}`;
+};
+
 // ==========================================
 // THERAPIST PROFILE OPERATIONS
 // ==========================================
@@ -200,6 +208,7 @@ export const createPatientProfile = async (
     hospitalId?: string
 ): Promise<PatientProfile | null> => {
     try {
+        const patientCode = generatePatientCode();
         const { data, error } = await supabase
             .from('patient_profiles')
             .insert({
@@ -208,6 +217,7 @@ export const createPatientProfile = async (
                 therapist_id: therapistId || null,
                 full_name: fullName,
                 hospital_id: hospitalId,
+                patient_code: patientCode,
             })
             .select()
             .single();

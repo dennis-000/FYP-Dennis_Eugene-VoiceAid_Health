@@ -23,15 +23,15 @@ export const THEMES = {
     danger: '#EF4444'    // Red
   },
   'high-contrast': {
-    bg: '#000000',       // Pure Black
-    card: '#1C1C1E',     // Dark Grey cards
-    text: '#FFFFFF',     // Pure White text
-    subText: '#D1D1D6',  // Light Grey text
-    primary: '#FFD700',  // Gold/Yellow (Best contrast on black)
-    accent: '#FFFFFF',   // White accent
-    border: '#FFFFFF',   // White borders
-    success: '#00FF00',  // Neon Green
-    danger: '#FF0000'    // Bright Red
+    bg: '#0F172A',       // Slate 900
+    card: '#1E293B',     // Slate 800
+    text: '#F8FAFC',     // Slate 50
+    subText: '#94A3B8',  // Slate 400
+    primary: '#3B82F6',  // Blue 500 (Matches light mode primary)
+    accent: '#60A5FA',   // Blue 400
+    border: '#334155',   // Slate 700
+    success: '#10B981',  // Emerald 500
+    danger: '#EF4444'    // Red 500
   }
 };
 

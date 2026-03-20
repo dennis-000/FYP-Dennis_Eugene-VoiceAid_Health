@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Activity, Calendar, ChevronRight, Grid, HeartPulse, LogOut, Mic, Settings } from 'lucide-react-native';
+import { Activity, BookOpen, Calendar, ChevronRight, ClipboardList, Grid, HeartPulse, LogOut, Mic, Settings } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useRole } from '../../contexts/RoleContext';
@@ -12,6 +12,7 @@ interface PatientDashboardProps {
     language: string;
     setLanguage: (lang: string) => void;
     patientType?: 'guest' | 'hospital' | null;
+    largeText?: boolean;
 }
 
 export const PatientDashboard: React.FC<PatientDashboardProps> = ({
@@ -19,10 +20,13 @@ export const PatientDashboard: React.FC<PatientDashboardProps> = ({
     colors,
     language,
     setLanguage,
-    patientType
+    patientType,
+    largeText = false
 }) => {
     const { setRole, setPatientType: setContextPatientType } = useRole();
+    const scale = largeText ? 1.25 : 1;
     const [patientName, setPatientName] = useState<string>('Patient');
+    const [patientCode, setPatientCode] = useState<string | null>(null);
     const [caregiverName, setCaregiverName] = useState<string | null>(null);
 
     useEffect(() => {
@@ -33,6 +37,8 @@ export const PatientDashboard: React.FC<PatientDashboardProps> = ({
         try {
             const name = await AsyncStorage.getItem('@voiceaid_patient_name');
             if (name) setPatientName(name);
+            const code = await AsyncStorage.getItem('@voiceaid_patient_code');
+            if (code) setPatientCode(code);
 
             if (patientType === 'hospital') {
                 const patientId = await AsyncStorage.getItem('@voiceaid_patient_id');
@@ -74,7 +80,7 @@ export const PatientDashboard: React.FC<PatientDashboardProps> = ({
                     onPress: async () => {
                         await AsyncStorage.removeItem('@voiceaid_patient_id');
                         await AsyncStorage.removeItem('@voiceaid_patient_name');
-                        await setRole('');
+                        await setRole(null);
                         await setContextPatientType(null);
                         router.replace('/');
                     }
@@ -84,7 +90,7 @@ export const PatientDashboard: React.FC<PatientDashboardProps> = ({
     };
 
     return (
-        <View style={styles.container}>
+        <View style={[styles.container, { backgroundColor: colors.bg }]}>
             <ScrollView
                 style={styles.scrollView}
                 contentContainerStyle={styles.scrollContent}
@@ -93,26 +99,58 @@ export const PatientDashboard: React.FC<PatientDashboardProps> = ({
                 {/* Header */}
                 <View style={styles.header}>
                     <View>
-                        <Text style={styles.welcomeText}>Welcome back,</Text>
-                        <Text style={styles.nameText}>{patientName}</Text>
+                        <Text style={[styles.welcomeText, { color: colors.subText, fontSize: 16 * scale }]}>Welcome back,</Text>
+                        <Text style={[styles.nameText, { color: colors.text, fontSize: 28 * scale }]}>{patientName}</Text>
                     </View>
-                    <View style={styles.typeBadge}>
-                        <Text style={styles.typeText}>
-                            {patientType === 'hospital' ? 'Hospital Patient' : 'Guest Patient'}
-                        </Text>
+                    <View style={{ alignItems: 'flex-end', gap: 4 }}>
+                        <View style={styles.typeBadge}>
+                            <Text style={styles.typeText}>
+                                {patientType === 'hospital' ? 'Hospital Patient' : 'Guest Patient'}
+                            </Text>
+                        </View>
+                        {patientCode && (
+                            <View style={[styles.typeBadge, { backgroundColor: '#fdf4ff', borderColor: '#a855f7' }]}>
+                                <Text style={[styles.typeText, { color: '#a855f7', fontWeight: '800', letterSpacing: 1 }]}>
+                                    {patientCode}
+                                </Text>
+                            </View>
+                        )}
+                    </View>
+                </View>
+
+                {/* Compact Language Selector at the Top */}
+                <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginBottom: 16 }}>
+                    <View style={styles.compactLanguageButtons}>
+                        {[{ code: 'en', label: 'English' }, { code: 'twi', label: 'Twi' }, { code: 'ga', label: 'Ga' }].map((lang) => (
+                            <TouchableOpacity
+                                key={lang.code}
+                                onPress={() => setLanguage(lang.code)}
+                                style={[
+                                    styles.compactLangButton,
+                                    language === lang.code && styles.compactLangButtonActive
+                                ]}
+                            >
+                                <Text style={[
+                                    styles.compactLangText,
+                                    language === lang.code && styles.compactLangTextActive
+                                ]}>
+                                    {lang.label}
+                                </Text>
+                            </TouchableOpacity>
+                        ))}
                     </View>
                 </View>
 
                 {/* My Caregiver Card */}
                 {patientType === 'hospital' && (
-                    <View style={styles.caregiverCard}>
+                    <View style={[styles.caregiverCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
                         <View style={styles.caregiverCardRow}>
                             <View style={styles.heartIconBadge}>
                                 <HeartPulse size={24} color="#ec4899" strokeWidth={2} />
                             </View>
                             <View style={styles.caregiverContent}>
-                                <Text style={styles.caregiverLabel}>My Caregiver</Text>
-                                <Text style={styles.caregiverValue}>
+                                <Text style={[styles.caregiverLabel, { fontSize: 13 * scale }]}>My Caregiver</Text>
+                                <Text style={[styles.caregiverValue, { color: colors.text, fontSize: 16 * scale }]}>
                                     {caregiverName ? caregiverName : 'Connected to Hospital'}
                                 </Text>
                             </View>
@@ -137,8 +175,8 @@ export const PatientDashboard: React.FC<PatientDashboardProps> = ({
                             <Mic size={32} color="#FFFFFF" strokeWidth={2.5} />
                         </View>
                         <View style={styles.primaryContent}>
-                            <Text style={styles.primaryTitle}>Speak Now</Text>
-                            <Text style={styles.primarySubtitle}>Start live transcription</Text>
+                            <Text style={[styles.primaryTitle, { fontSize: 22 * scale }]}>Speak Now</Text>
+                            <Text style={[styles.primarySubtitle, { fontSize: 14 * scale }]}>Start live transcription</Text>
                         </View>
                         <ChevronRight size={24} color="rgba(255,255,255,0.8)" />
                     </LinearGradient>
@@ -146,7 +184,7 @@ export const PatientDashboard: React.FC<PatientDashboardProps> = ({
 
                 {/* Patient Tools */}
                 <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>My Tools</Text>
+                    <Text style={[styles.sectionTitle, { color: colors.text, fontSize: 18 * scale }]}>My Tools</Text>
 
                     <View style={styles.toolsGrid}>
                         {/* Phrase Board */}
@@ -158,25 +196,39 @@ export const PatientDashboard: React.FC<PatientDashboardProps> = ({
                             <View style={[styles.toolIcon, { backgroundColor: '#eff6ff' }]}>
                                 <Grid size={24} color="#3b82f6" strokeWidth={2} />
                             </View>
-                            <Text style={styles.toolText}>Phrase Board</Text>
-                            <Text style={styles.toolSubText}>Quick text-to-speech</Text>
+                            <Text style={[styles.toolText, { color: colors.text, fontSize: 15 * scale }]}>Phrase Board</Text>
+                            <Text style={[styles.toolSubText, { fontSize: 12 * scale }]}>Quick text-to-speech</Text>
                         </TouchableOpacity>
 
-                        {/* Reminders (Hospital only) */}
+
+
+                        {/* Voice Journal */}
+                        <TouchableOpacity
+                            onPress={() => router.push('/journal')}
+                            activeOpacity={0.8}
+                            style={styles.toolCard}
+                        >
+                            <View style={[styles.toolIcon, { backgroundColor: '#f0fdfa' }]}>
+                                <BookOpen size={24} color="#0d9488" strokeWidth={2} />
+                            </View>
+                            <Text style={styles.toolText}>Voice Journal</Text>
+                            <Text style={styles.toolSubText}>Daily recording</Text>
+                        </TouchableOpacity>
+
+                        {/* My Assignments (Hospital only) */}
                         {patientType === 'hospital' && (
                             <TouchableOpacity
-                                onPress={() => router.push('/routine')}
+                                onPress={() => router.push('/my-assignments')}
                                 activeOpacity={0.8}
                                 style={styles.toolCard}
                             >
-                                <View style={[styles.toolIcon, { backgroundColor: '#f0fdf4' }]}>
-                                    <Calendar size={24} color="#22c55e" strokeWidth={2} />
+                                <View style={[styles.toolIcon, { backgroundColor: '#fdf4ff' }]}>
+                                    <ClipboardList size={24} color="#a855f7" strokeWidth={2} />
                                 </View>
-                                <Text style={styles.toolText}>Reminders</Text>
-                                <Text style={styles.toolSubText}>Daily tasks</Text>
+                                <Text style={styles.toolText}>Assignments</Text>
+                                <Text style={styles.toolSubText}>Therapy exercises</Text>
                             </TouchableOpacity>
                         )}
-
                         {/* History */}
                         <TouchableOpacity
                             onPress={() => router.push('/history')}
@@ -205,29 +257,7 @@ export const PatientDashboard: React.FC<PatientDashboardProps> = ({
                     </View>
                 </View>
 
-                {/* Language Map (Minimalist) */}
-                <View style={styles.languageSection}>
-                    <Text style={styles.sectionTitle}>App Language</Text>
-                    <View style={styles.languageButtons}>
-                        {[{ code: 'en', label: 'English' }, { code: 'twi', label: 'Twi' }, { code: 'ga', label: 'Ga' }].map((lang) => (
-                            <TouchableOpacity
-                                key={lang.code}
-                                onPress={() => setLanguage(lang.code)}
-                                style={[
-                                    styles.langButton,
-                                    language === lang.code && styles.langButtonActive
-                                ]}
-                            >
-                                <Text style={[
-                                    styles.langText,
-                                    language === lang.code && styles.langTextActive
-                                ]}>
-                                    {lang.label}
-                                </Text>
-                            </TouchableOpacity>
-                        ))}
-                    </View>
-                </View>
+
 
                 {/* Logout Button */}
                 <TouchableOpacity
@@ -395,7 +425,6 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         flexWrap: 'wrap',
         justifyContent: 'space-between',
-        gap: 12,
     },
     toolCard: {
         width: '48%',
@@ -433,23 +462,19 @@ const styles = StyleSheet.create({
         textAlign: 'center',
     },
 
-    // Language
-    languageSection: {
-        marginBottom: 32,
-    },
-    languageButtons: {
+    // Compact Language
+    compactLanguageButtons: {
         flexDirection: 'row',
         backgroundColor: '#f3f4f6',
-        borderRadius: 12,
+        borderRadius: 20,
         padding: 4,
     },
-    langButton: {
-        flex: 1,
-        paddingVertical: 10,
-        alignItems: 'center',
-        borderRadius: 8,
+    compactLangButton: {
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 16,
     },
-    langButtonActive: {
+    compactLangButtonActive: {
         backgroundColor: '#FFFFFF',
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 1 },
@@ -457,12 +482,12 @@ const styles = StyleSheet.create({
         shadowRadius: 2,
         elevation: 1,
     },
-    langText: {
-        fontSize: 14,
+    compactLangText: {
+        fontSize: 12,
         fontWeight: '600',
         color: '#6b7280',
     },
-    langTextActive: {
+    compactLangTextActive: {
         color: '#6366f1',
     },
 
