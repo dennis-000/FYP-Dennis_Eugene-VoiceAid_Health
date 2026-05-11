@@ -1,0 +1,112 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --sidebar-width: 260px;
+  --sidebar-collapsed: 72px;
+  --sidebar-bg: #111111; /* Deep Black */
+  --sidebar-text: #E5E7EB;
+  --sidebar-active: #FFD700; /* Kente Gold */
+  --sidebar-hover: #222222;
+  --accent-gradient: linear-gradient(135deg, #FFD700, #CC0000); /* Kente Gold to Red */
+  --card-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  --card-shadow-hover: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+}
+
+body {
+  background: #FAFAFA;
+  color: #111111;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Kente Inspired Patterns ── */
+.kente-strip-bottom::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 6px;
+  background: repeating-linear-gradient(
+    to right,
+    #CC0000 0, #CC0000 40px,     /* Red */
+    #FFD700 40px, #FFD700 80px,   /* Gold */
+    #008000 80px, #008000 120px,  /* Green */
+    #111111 120px, #111111 160px  /* Black */
+  );
+}
+
+.kente-strip-right::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: 0;
+  width: 6px;
+  background: repeating-linear-gradient(
+    to bottom,
+    #CC0000 0, #CC0000 40px,     /* Red */
+    #FFD700 40px, #FFD700 80px,   /* Gold */
+    #008000 80px, #008000 120px,  /* Green */
+    #111111 120px, #111111 160px  /* Black */
+  );
+}
+
+/* ── Custom scrollbar ── */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #94A3B8; }
+
+/* ── Animated counter ── */
+@keyframes countUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-count { animation: countUp 0.5s ease-out forwards; }
+
+/* ── Fade in ── */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-in { animation: fadeIn 0.4s ease-out forwards; }
+
+/* ── Staggered children ── */
+.stagger > *:nth-child(1) { animation-delay: 0ms; }
+.stagger > *:nth-child(2) { animation-delay: 80ms; }
+.stagger > *:nth-child(3) { animation-delay: 160ms; }
+.stagger > *:nth-child(4) { animation-delay: 240ms; }
+.stagger > *:nth-child(5) { animation-delay: 320ms; }
+
+/* ── Pulse dot (live indicator) ── */
+@keyframes pulseDot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(1.5); }
+}
+.pulse-dot { animation: pulseDot 2s ease-in-out infinite; }
+
+/* ── Card hover lift ── */
+.card-hover {
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+.card-hover:hover {
+  box-shadow: var(--card-shadow-hover);
+  transform: translateY(-2px);
+}
+
+/* ── Gradient text ── */
+.gradient-text {
+  background: var(--accent-gradient);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ── Glass card ── */
+.glass {
+  backdrop-filter: blur(12px);
+  background: rgba(255,255,255,0.8);
+  border: 1px solid rgba(255,255,255,0.6);
+}
