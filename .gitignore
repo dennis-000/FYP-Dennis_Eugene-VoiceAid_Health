@@ -1,5 +1,18 @@
-﻿node_modules/
+node_modules/
 .next/
 .expo/
 dist/
 *.log
+
+# Firebase credentials (SENSITIVE - but google-services.json needed for EAS Build)
+voiceaid-health-firebase-adminsdk-fbsvc-bb9acf74b4.json
+*firebase-adminsdk*.json
+firebase-service-account.json
+
+# Local env & backend build directories
+.env
+.env*.local
+backend-env/
+__pycache__/
+*.pyc
+

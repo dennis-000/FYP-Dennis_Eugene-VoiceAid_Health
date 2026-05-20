@@ -37,3 +37,14 @@ therapist_signup_guide.md
 organization_data.md
 admin_setup_guide.md
 organization_plan.md
+
+# Large python & environment files
+backend-env/
+__pycache__/
+dataset/
+attached_assets/
+*.pyc
+voiceaid-health-firebase-adminsdk-fbsvc-bb9acf74b4.json
+firebase-service-account.json
+.env
+.env*.local
