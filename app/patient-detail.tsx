@@ -1,20 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import {
-    Activity,
-    ArrowLeft,
-    CheckCircle2,
-    Clock,
-    MessageSquare,
-    Mic,
-    Plus,
-    Trash2,
-    TrendingUp
-} from 'lucide-react-native';
 import React, { useContext, useEffect, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
+    Linking,
     Modal,
     ScrollView,
     StyleSheet,
@@ -24,11 +14,27 @@ import {
     View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { 
+    Activity, 
+    ArrowLeft, 
+    CheckCircle2, 
+    Clock, 
+    MapPin, 
+    MessageSquare, 
+    Mic, 
+    Plus, 
+    ShieldAlert, 
+    Trash2, 
+    TrendingUp, 
+    X 
+} from 'lucide-react-native';
 import { useAuth } from '../contexts/AuthContext';
 import { GoalCategory, GoalService, PatientGoal } from '../services/goalService';
 import { JournalService, VoiceJournal } from '../services/journalService';
+import { AnalyticsService, SessionRecord } from '../services/analyticsService';
 import { AppContext } from './_layout';
 import { useT } from '../utils/i18n';
+import { supabase } from '../lib/supabase';
 
 // --- SLP-Backed Suggested Assignments ---
 type SuggestedItem = {
@@ -78,10 +84,11 @@ export default function PatientDetailScreen() {
     const patientName = params.name as string || 'Patient';
     const patientType = params.type as string;
 
-    const [activeMainTab, setActiveMainTab] = useState<'assignments' | 'journal'>('assignments');
+    const [activeMainTab, setActiveMainTab] = useState<'assignments' | 'journal' | 'analytics'>('assignments');
 
     const [goals, setGoals] = useState<PatientGoal[]>([]);
     const [journals, setJournals] = useState<VoiceJournal[]>([]);
+    const [analytics, setAnalytics] = useState<SessionRecord[]>([]);
     const [loading, setLoading] = useState(true);
     const [showModal, setShowModal] = useState(false);
     const [showSuggestions, setShowSuggestions] = useState(false);
@@ -91,13 +98,80 @@ export default function PatientDetailScreen() {
     const [requiresRecording, setRequiresRecording] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
     const [filterCat, setFilterCat] = useState<GoalCategory | 'all'>('all');
+    const [activeAlert, setActiveAlert] = useState<SessionRecord | null>(null);
 
     const CATEGORY_TABS: (GoalCategory | 'all')[] = ['all', 'communication', 'language', 'social', 'fluency', 'voice', 'speech_sound'];
 
     useEffect(() => {
         loadGoals();
         loadJournals();
+        loadAnalytics();
+        checkActiveEmergency();
+
+        // Real-time subscription for Clinical Priority alerts
+        const channel = supabase
+            .channel(`patient-alerts-${patientId}`)
+            .on(
+                'postgres_changes',
+                {
+                    event: 'INSERT',
+                    schema: 'public',
+                    table: 'patient_analytics',
+                    // Listen for any priority alert, then filter in JS to handle both ID types
+                },
+                (payload) => {
+                    const incomingId = payload.new.patient_profile_id || payload.new.user_id;
+                    if (incomingId !== patientId) return;
+
+                    console.log('[Real-time Analytics] 🚨 New priority event:', payload.new);
+                    const newRecord = {
+                        id: payload.new.id,
+                        date: payload.new.created_at,
+                        duration: payload.new.duration,
+                        wordCount: payload.new.word_count,
+                        messageCount: payload.new.message_count,
+                        language: payload.new.language,
+                        mode: payload.new.mode,
+                        metadata: payload.new.metadata
+                    } as SessionRecord;
+
+                    setAnalytics(prev => [newRecord, ...prev]);
+                    
+                    if (newRecord.mode === 'CLINICAL_PRIORITY' || newRecord.mode === 'EMERGENCY') {
+                        setActiveAlert(newRecord);
+                    }
+                }
+            )
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
     }, [patientId]);
+
+    const loadAnalytics = async () => {
+        const data = await AnalyticsService.getPatientAnalytics(patientId);
+        setAnalytics(data);
+    };
+
+    const checkActiveEmergency = async () => {
+        const emergencies = await AnalyticsService.getActiveEmergencies([patientId]);
+        if (emergencies.length > 0) {
+            // Reconstruct a minimal SessionRecord to populate the alert UI
+            setActiveAlert({
+                id: 'active-alert',
+                date: new Date().toISOString(),
+                duration: 0,
+                wordCount: 0,
+                messageCount: 0,
+                language: 'en',
+                mode: 'CLINICAL_PRIORITY',
+                metadata: emergencies[0].metadata
+            } as SessionRecord);
+        } else {
+            setActiveAlert(null);
+        }
+    };
 
     const loadJournals = async () => {
         const data = await JournalService.getPatientJournals(patientId);
@@ -183,6 +257,34 @@ export default function PatientDetailScreen() {
             </View>
 
             <ScrollView showsVerticalScrollIndicator={false}>
+                {/* Clinical Priority Alert Banner */}
+                {activeAlert && (
+                    <View style={styles.alertBanner}>
+                        <View style={styles.alertHeader}>
+                            <ShieldAlert size={20} color="#fff" />
+                            <Text style={styles.alertTitle}>CLINICAL PRIORITY ALERT</Text>
+                            <TouchableOpacity onPress={async () => {
+                                await AnalyticsService.resolveEmergency(patientId, 'Therapist');
+                                setActiveAlert(null);
+                            }}>
+                                <X size={20} color="#fff" />
+                            </TouchableOpacity>
+                        </View>
+                        <Text style={styles.alertMsg}>
+                            Patient triggered an emergency alert.
+                        </Text>
+                        {activeAlert.metadata?.latitude && (
+                            <TouchableOpacity 
+                                style={styles.locationBtn}
+                                onPress={() => Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${activeAlert.metadata.latitude},${activeAlert.metadata.longitude}`)}
+                            >
+                                <MapPin size={16} color="#ef4444" />
+                                <Text style={styles.locationBtnText}>View Live Location</Text>
+                            </TouchableOpacity>
+                        )}
+                    </View>
+                )}
+
                 {/* Quick Actions */}
                 <View style={styles.quickActions}>
                     <TouchableOpacity
@@ -223,6 +325,12 @@ export default function PatientDetailScreen() {
                         onPress={() => setActiveMainTab('journal')}
                     >
                         <Text style={{ fontWeight: 'bold', color: activeMainTab === 'journal' ? colors.primary : colors.subText }}>{tr('voiceJournal')}</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                        style={{ flex: 1, paddingVertical: 12, alignItems: 'center', borderBottomWidth: 3, borderBottomColor: activeMainTab === 'analytics' ? colors.primary : 'transparent' }}
+                        onPress={() => setActiveMainTab('analytics')}
+                    >
+                        <Text style={{ fontWeight: 'bold', color: activeMainTab === 'analytics' ? colors.primary : colors.subText }}>Insights</Text>
                     </TouchableOpacity>
                 </View>
 
@@ -378,6 +486,70 @@ export default function PatientDetailScreen() {
                                         </View>
                                     </View>
                                     <Text style={[styles.goalDesc, { color: colors.text, fontStyle: 'italic', fontSize: 14, lineHeight: 22 }]}>"{journal.transcript}"</Text>
+                                </View>
+                            ))
+                        )}
+                    </View>
+                )}
+
+                {/* Clinical Insights Section */}
+                {activeMainTab === 'analytics' && (
+                    <View style={styles.section}>
+                        <View style={styles.statsGrid}>
+                            <View style={[styles.statItem, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                                <Text style={[styles.statValue, { color: colors.primary }]}>{analytics.reduce((sum, s) => sum + s.wordCount, 0)}</Text>
+                                <Text style={[styles.statLabel, { color: colors.subText }]}>Total Words</Text>
+                            </View>
+                            <View style={[styles.statItem, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                                <Text style={[styles.statValue, { color: '#10b981' }]}>{analytics.length}</Text>
+                                <Text style={[styles.statLabel, { color: colors.subText }]}>Sessions</Text>
+                            </View>
+                        </View>
+
+                        <View style={[styles.insightCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                            <Text style={[styles.insightTitle, { color: colors.text }]}>Communication Modes</Text>
+                            {analytics.length === 0 ? (
+                                <Text style={{ color: colors.subText, fontSize: 13, marginTop: 8 }}>No session data available yet.</Text>
+                            ) : (
+                                <View style={{ gap: 8, marginTop: 10 }}>
+                                    {Array.from(new Set(analytics.map(s => s.language))).map(lang => {
+                                        const count = analytics.filter(s => s.language === lang).length;
+                                        const pct = Math.round((count / analytics.length) * 100);
+                                        return (
+                                            <View key={lang} style={styles.langRow}>
+                                                <Text style={[styles.langName, { color: colors.text }]}>{lang.toUpperCase()}</Text>
+                                                <View style={styles.barContainer}>
+                                                    <View style={[styles.barFill, { width: `${pct}%` as any, backgroundColor: colors.primary }]} />
+                                                </View>
+                                                <Text style={[styles.langPct, { color: colors.subText }]}>{pct}%</Text>
+                                            </View>
+                                        );
+                                    })}
+                                </View>
+                            )}
+                        </View>
+
+                        <Text style={[styles.sectionTitle, { color: colors.text, marginBottom: 12, marginTop: 20 }]}>Recent Activities</Text>
+                        {analytics.length === 0 ? (
+                            <View style={[styles.emptyCard, { borderStyle: 'dashed' }]}>
+                                <Activity size={32} color={colors.subText} />
+                                <Text style={{ color: colors.subText, marginTop: 8 }}>Waiting for first clinical session...</Text>
+                            </View>
+                        ) : (
+                            analytics.map(session => (
+                                <View key={session.id} style={[styles.sessionRow, { borderBottomColor: colors.border }]}>
+                                    <View style={styles.sessionLeft}>
+                                        <Text style={[styles.sessionDate, { color: colors.text }]}>
+                                            {new Date(session.date).toLocaleDateString()}
+                                        </Text>
+                                        <Text style={[styles.sessionTime, { color: colors.subText }]}>
+                                            {new Date(session.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                        </Text>
+                                    </View>
+                                    <View style={styles.sessionRight}>
+                                        <Text style={[styles.sessionWords, { color: colors.primary }]}>{session.wordCount} words</Text>
+                                        <Text style={[styles.sessionDuration, { color: colors.subText }]}>{Math.round(session.duration)}s • {session.mode}</Text>
+                                    </View>
                                 </View>
                             ))
                         )}
@@ -688,5 +860,127 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.05,
         shadowRadius: 4,
     },
+    statsGrid: {
+        flexDirection: 'row',
+        gap: 12,
+        marginBottom: 20,
+    },
+    statItem: {
+        flex: 1,
+        padding: 16,
+        borderRadius: 16,
+        borderWidth: 1,
+        alignItems: 'center',
+    },
+    statValue: {
+        fontSize: 24,
+        fontWeight: 'bold',
+    },
+    statLabel: {
+        fontSize: 12,
+        marginTop: 4,
+    },
+    alertBanner: {
+        backgroundColor: '#ef4444',
+        margin: 16,
+        padding: 16,
+        borderRadius: 20,
+        shadowColor: '#ef4444',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 10,
+        elevation: 8,
+    },
+    alertHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: 8,
+    },
+    alertTitle: {
+        color: '#fff',
+        fontSize: 14,
+        fontWeight: '900',
+        letterSpacing: 1,
+    },
+    alertMsg: {
+        color: '#fff',
+        fontSize: 16,
+        fontWeight: '600',
+        marginBottom: 12,
+    },
+    locationBtn: {
+        backgroundColor: '#fff',
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 12,
+        borderRadius: 12,
+        gap: 8,
+    },
+    locationBtnText: {
+        color: '#ef4444',
+        fontWeight: '800',
+        fontSize: 14,
+    },
+    insightCard: {
+        padding: 16,
+        borderRadius: 16,
+        borderWidth: 1,
+        marginBottom: 20,
+    },
+    insightTitle: {
+        fontSize: 15,
+        fontWeight: 'bold',
+    },
+    langRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+    },
+    langName: {
+        width: 40,
+        fontSize: 11,
+        fontWeight: 'bold',
+    },
+    barContainer: {
+        flex: 1,
+        height: 6,
+        backgroundColor: '#f3f4f6',
+        borderRadius: 3,
+        overflow: 'hidden',
+    },
+    barFill: {
+        height: '100%',
+    },
+    langPct: {
+        width: 35,
+        fontSize: 11,
+        textAlign: 'right',
+    },
+    sessionRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        paddingVertical: 12,
+        borderBottomWidth: 1,
+    },
+    sessionLeft: {},
+    sessionDate: {
+        fontSize: 14,
+        fontWeight: '600',
+    },
+    sessionTime: {
+        fontSize: 12,
+    },
+    sessionRight: {
+        alignItems: 'flex-end',
+    },
+    sessionWords: {
+        fontSize: 14,
+        fontWeight: '700',
+    },
+    sessionDuration: {
+        fontSize: 12,
+    }
 });
 

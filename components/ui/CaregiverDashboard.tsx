@@ -1,11 +1,12 @@
 import { useFocusEffect } from '@react-navigation/native';
 import * as Clipboard from 'expo-clipboard';
 import { useRouter } from 'expo-router';
-import { Activity, Calendar, ChevronRight, Copy, Globe, Grid, LayoutGrid, Mic, Settings, UserPlus, Users } from 'lucide-react-native';
+import { Activity, Calendar, ChevronRight, Copy, Globe, Grid, LayoutGrid, Mic, Settings, UserPlus, Users, AlertTriangle, X } from 'lucide-react-native';
 import React, { useCallback, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useAuth } from '../../contexts/AuthContext';
 import { getLanguageFlag, getTranslationsSync, Language } from '../../services/translationService';
+import { AnalyticsService } from '../../services/analyticsService';
 
 interface CaregiverDashboardProps {
     router: any;
@@ -26,6 +27,7 @@ export const CaregiverDashboard: React.FC<CaregiverDashboardProps> = ({
     const { therapistProfile, loadTherapistProfile, user } = useAuth();
     const t = getTranslationsSync(language as Language);
     const [livePatientCount, setLivePatientCount] = useState(0);
+    const [activeEmergencies, setActiveEmergencies] = useState<{patientId: string, name: string}[]>([]);
 
     // Force real-time refresh whenever they view the dashboard
     useFocusEffect(
@@ -37,9 +39,27 @@ export const CaregiverDashboard: React.FC<CaregiverDashboardProps> = ({
                     const { getTherapistPatients } = await import('../../services/profileService');
                     const patients = await getTherapistPatients(therapistProfile.id);
                     setLivePatientCount(patients.length);
+                    
+                    // Fetch active emergencies
+                    const patientIds = patients.map(p => p.id);
+                    if (patientIds.length > 0) {
+                        const emergencies = await AnalyticsService.getActiveEmergencies(patientIds);
+                        const mappedEmergencies = emergencies.map(e => {
+                            const p = patients.find(pat => pat.id === e.patientId);
+                            return {
+                                patientId: e.patientId,
+                                name: p?.full_name || 'Unknown Patient'
+                            };
+                        });
+                        setActiveEmergencies(mappedEmergencies);
+                    }
                 }
             };
             syncData();
+            
+            // Set up polling for emergencies every 10 seconds while focused
+            const intervalId = setInterval(syncData, 10000);
+            return () => clearInterval(intervalId);
         }, [user?.id, therapistProfile?.id])
     );
 
@@ -49,6 +69,20 @@ export const CaregiverDashboard: React.FC<CaregiverDashboardProps> = ({
         await Clipboard.setStringAsync(codeToCopy);
         Alert.alert('Copied!', 'Patient Invite Code has been copied to your clipboard.');
     };
+    
+    const resolveEmergency = async (patientId: string) => {
+        Alert.alert(
+            "Resolve Emergency",
+            "Are you sure you want to dismiss this patient's emergency alert?",
+            [
+                { text: "Cancel", style: "cancel" },
+                { text: "Dismiss", style: "destructive", onPress: async () => {
+                    await AnalyticsService.resolveEmergency(patientId, 'Therapist');
+                    setActiveEmergencies(prev => prev.filter(e => e.patientId !== patientId));
+                }}
+            ]
+        );
+    };
 
     return (
         <View style={[styles.container, { backgroundColor: colors?.bg }]}>
@@ -57,6 +91,25 @@ export const CaregiverDashboard: React.FC<CaregiverDashboardProps> = ({
                 contentContainerStyle={styles.scrollContent}
                 showsVerticalScrollIndicator={false}
             >
+                {/* Emergency Banners */}
+                {activeEmergencies.map((emergency, idx) => (
+                    <View key={`em-${emergency.patientId}-${idx}`} style={styles.emergencyBanner}>
+                        <View style={styles.emergencyBannerContent}>
+                            <AlertTriangle size={24} color="#fff" />
+                            <View style={{ flex: 1, marginLeft: 12 }}>
+                                <Text style={styles.emergencyBannerTitle}>🚨 ACTIVE EMERGENCY</Text>
+                                <Text style={styles.emergencyBannerText}>{emergency.name} needs immediate help!</Text>
+                            </View>
+                        </View>
+                        <TouchableOpacity 
+                            style={styles.emergencyResolveBtn} 
+                            onPress={() => resolveEmergency(emergency.patientId)}
+                        >
+                            <Text style={styles.emergencyResolveText}>Dismiss</Text>
+                        </TouchableOpacity>
+                    </View>
+                ))}
+
                 {/* Header */}
                 <View style={styles.header}>
                     <View>
@@ -226,6 +279,49 @@ const styles = StyleSheet.create({
     // Header
     header: {
         marginBottom: 24,
+    },
+    emergencyBanner: {
+        backgroundColor: '#dc2626',
+        borderRadius: 16,
+        padding: 16,
+        marginBottom: 20,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        shadowColor: '#ef4444',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+        elevation: 6,
+    },
+    emergencyBannerContent: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        flex: 1,
+    },
+    emergencyBannerTitle: {
+        color: '#fff',
+        fontSize: 14,
+        fontWeight: '900',
+        letterSpacing: 0.5,
+        marginBottom: 2,
+    },
+    emergencyBannerText: {
+        color: '#fca5a5',
+        fontSize: 13,
+        fontWeight: '600',
+    },
+    emergencyResolveBtn: {
+        backgroundColor: '#fff',
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        borderRadius: 8,
+        marginLeft: 10,
+    },
+    emergencyResolveText: {
+        color: '#dc2626',
+        fontWeight: 'bold',
+        fontSize: 13,
     },
     welcomeText: {
         fontSize: 14,

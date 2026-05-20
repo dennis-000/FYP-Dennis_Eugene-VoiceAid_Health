@@ -82,6 +82,8 @@ const translations = {
     largeTextSub:   { en: 'Increases font scaling globally', twi: 'Nhoma no bɛkɛse', ga: 'Nhoma bɛkɛse' },
     reduceMotion:   { en: 'Reduce Motion',   twi: 'Si tumi gu',       ga: 'Si tumi' },
     reduceMotionSub:{ en: 'Limits UI animations', twi: 'Nsakraee kakra', ga: 'Kɛkɛ' },
+    hapticFeedback: { en: 'Haptic Feedback', twi: 'Nsa mpaebɔ', ga: 'Vibrate wiemɔ' },
+    hapticSub:      { en: 'Vibrate when starting or stopping voice input', twi: 'Vibrate bere a wofiti kasa ase anaa wowie', ga: 'Vibrate kɛ o fiti wiemɔ ase lo o gbe na' },
     languageRegion: { en: 'Language & Region', twi: 'Kasa & Subu',   ga: 'Kasa' },
     appLanguage:    { en: 'App Language',    twi: 'App Kasa',         ga: 'App Kasa' },
     voiceAssistant: { en: 'Voice Assistant Preferences', twi: 'Kasa Dwuma Nhyehyɛe', ga: 'Wiemɔ Nhyehyɛe' },
@@ -112,6 +114,11 @@ const translations = {
     catMedical:          { en: 'Medical',             twi: 'Ayaresa',     ga: 'Bolga' },
     catSocial:           { en: 'Social',              twi: 'Amanfoɔ',     ga: 'Nipa' },
     catCustom:           { en: 'Custom',              twi: 'Wo Deɛ',      ga: 'Bɔ Deɛ' },
+    catCommunication:    { en: 'Communication',       twi: 'Nkitahodie',  ga: 'Wiemɔ' },
+    catLanguage:         { en: 'Language',            twi: 'Kasa',        ga: 'Wiemɔ' },
+    catFluency:          { en: 'Fluency',             twi: 'Kasa Ahoɔden', ga: 'Wiemɔ Hewale' },
+    catVoice:            { en: 'Voice',               twi: 'Nne',         ga: 'Gbee' },
+    catSpeechSound:      { en: 'Speech Sound',        twi: 'Kasa Nnyegyeeɛ', ga: 'Wiemɔ Gbee' },
     clearSentence:       { en: 'Clear',               twi: 'Popa nsɛm',   ga: 'Naa fɛɛ' },
     speakingBtn:         { en: 'Speaking...',         twi: 'Ɔrekasa...',  ga: 'Ɛkasa...' },
     tabWho:              { en: 'Who',                 twi: 'Hwan',        ga: 'Namɔ' },
@@ -194,6 +201,25 @@ const translations = {
     chooseExercise: { en: 'Choose an exercise to start', twi: 'Yi baako', ga: 'Yi baako' },
     noExercises:    { en: 'No exercises today', twi: 'Ahoɔden nni hɔ', ga: 'Ahoɔden nni hɔ' },
     noExercisesSub: { en: "Your therapist hasn't assigned any exercises yet.", twi: 'W\'okyerɛkyerɛfo nnyaa adwuma biara.', ga: 'Onyerɛ adwuma nni.' },
+    clinicalSOSTitle: { en: 'Clinical Priority Alert', twi: 'Boa Ntɛm!', ga: 'Boa!' },
+    clinicalCallForHelpSub: { en: 'Send live location and status to caregivers', twi: 'Nya mmoa na bɔ okyɛfa amanneɛ', ga: 'Naa yelikɛbuam ni ohale ohwɛlɔ lɛ nɔ' },
+    clinicalAlertMsg: { en: 'Attention, I am {name}. I am having a medical difficulty and cannot speak. Please check my location.', twi: 'Mepa w\'akyɛw, me ne {name}. Mehia mmoa mpofirim na mentumi nkasa. Mepa w\'akyɛw boa me.', ga: 'Ofainɛ, miji {name}. Mihaia yelikɛbuam amrɔ nɛɛ ni nyɛmim miewiemɔ. Ofainɛ waami.' },
+    medicalIDTitle: { en: 'Medical ID', twi: 'Ayaresafoɔ Nifo', ga: 'Bolga Helatsɛ Nifo' },
+    conditionLabel: { en: 'Condition', twi: 'Ɔyarefoɔ', ga: 'Helatsɛ' },
+    allergiesLabel: { en: 'Allergies', twi: 'Mewu', ga: 'Mewu' },
+    bloodTypeLabel: { en: 'Blood Type', twi: 'Mogya', ga: 'Lā' },
+    emergencyContactLabel: { en: 'Emergency Contact', twi: 'Boa Ntɛm Contact', ga: 'Boa Contact' },
+    broadcastAlert: { en: 'Broadcast Voice Alert', twi: 'Bɔ amanneɛ ntɛm', ga: 'Bɔ amanneɛ' },
+    stopAlert: { en: 'Stop Alert', twi: 'Gyae amanneɛ', ga: 'Gyae' },
+    clinicalSosContacts: { en: 'Emergency Contacts', twi: 'Boa Ntɛm!', ga: 'Boa!' },
+    clinicalAddContact: { en: 'Add Contact', twi: 'Ka nipa ho', ga: 'Ka mɔ' },
+    clinicalAddContactSub: { en: 'Save up to 3 contacts for quick access during emergencies.', twi: 'Hyehyɛ nnipa baasa a wobɛka wɔn ho.', ga: 'Okɛ mɛi etɛ' },
+    clinicalAddEmergencyContact: { en: 'Add Emergency Contact', twi: 'Ka Boa Ntɛm nipa ho', ga: 'Ka Boa Contact' },
+    clinicalNoContactSet: { en: 'No Contacts Set', twi: 'Nipa biara nni hɔ', ga: 'Mɔ ko nni hɔ' },
+    clinicalNoContactSetSub: { en: 'Please add at least one emergency contact to use this feature.', twi: 'Mepa w\'akyɛw ka nipa baako kɛseɛ ho.', ga: 'Ofainɛ ka mɔ ko' },
+    clinicalCallingPrefix: { en: 'Calling ', twi: 'Ɔrefrɛ ', ga: 'Mi tswɛ ' },
+    clinicalCalling: { en: 'Calling...', twi: 'Ɔrefrɛ...', ga: 'Mi tswɛ...' },
+    clinicalCallForHelp: { en: 'Tap to call', twi: 'Mia so na frɛ', ga: 'Tswɛ' },
     hold:           { en: '— Hold! —',       twi: '— So mu! —',        ga: '— Twe! —' },
     rest:           { en: '— Rest —',        twi: '— Gyae kakra —',    ga: '— Gyae —' },
     repOf:          { en: 'Rep',             twi: 'Adeɛ',               ga: 'Adeɛ' },
@@ -449,7 +475,39 @@ export function formatCount(count: number, lang: Language): string {
  */
 export function useT(lang: Language) {
     const tr = (key: keyof typeof translations) => t(key, lang);
+
+    /**
+     * Cleans, normalizes, and translates English goal/exercise titles or descriptions
+     * into Twi or Ga when the app language is switched.
+     */
+    const translateText = (text: string | null | undefined): string => {
+        if (!text) return '';
+        const clean = text.trim().toLowerCase().replace(/[.,\/#!$%\^&\*;:{}=\-_`~()'"“”‘’]/g, "").replace(/\s+/g, " ");
+        
+        const map: Record<string, keyof typeof translations> = {
+            'repeat target sounds': 'slpSuggIsolationTitle',
+            'practice target speech sounds in isolation then in words 10 reps': 'slpSuggIsolationDesc',
+            'tongue tip exercises': 'slpSuggTongueTitle',
+            'touch tongue tip to roof of mouth 10 times hold 3 seconds each': 'slpSuggTongueDesc',
+            'name 5 objects daily': 'slpSuggNameObjectsTitle',
+            'point to 5 objects in the room and name each one clearly': 'slpSuggNameObjectsDesc',
+            'use 3-word phrases': 'slpSuggThreeWordTitle',
+            'practice communicating using at least 3-word sentences': 'slpSuggThreeWordDesc',
+            'slow speech practice': 'slpSuggSlowSpeechTitle',
+            'speak at a deliberately slow pace for 5 minutes to reduce stammering': 'slpSuggSlowSpeechDesc',
+            'sustain vowel for 5s': 'slpSuggVowelTitle',
+            'say ahhh steadily for 5 seconds repeat 5 times': 'slpSuggVowelDesc'
+        };
+
+        const key = map[clean];
+        if (key) {
+            return t(key, lang);
+        }
+        return text;
+    };
+
     return Object.assign(tr, {
-        formatCount: (count: number) => formatCount(count, lang)
+        formatCount: (count: number) => formatCount(count, lang),
+        translateText
     });
 }

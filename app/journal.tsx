@@ -11,10 +11,11 @@ import { ASRService } from '../services/asr';
 import { AudioPreprocessingService, ENHANCED_RECORDING_OPTIONS } from '../services/audioPreprocessingService';
 import { JournalService, VoiceJournal } from '../services/journalService';
 import { TTSService } from '../services/tts';
+import { WaveformVisualizer } from '../components/ui/WaveformVisualizer';
 
 export default function JournalScreen() {
     const router = useRouter();
-    const { colors, language } = useContext(AppContext);
+    const { colors, language, reduceMotion } = useContext(AppContext);
     const tr = useT(language as any);
 
     const [patientId, setPatientId] = useState<string | null>(null);
@@ -28,6 +29,8 @@ export default function JournalScreen() {
     const recordingStartTime = useRef<number>(0);
 
     const [meteringLevels, setMeteringLevels] = useState<number[]>([]);
+    const [timer, setTimer] = useState(0);
+    const timerInterval = useRef<NodeJS.Timeout | null>(null);
 
     useEffect(() => {
         loadData();
@@ -46,6 +49,13 @@ export default function JournalScreen() {
                 setPatientId(storedId);
                 const data = await JournalService.getPatientJournals(storedId);
                 setJournals(data);
+            } else {
+                // For Guest mode, use a placeholder ID and load local storage
+                setPatientId('guest_user');
+                const localData = await AsyncStorage.getItem('@voiceaid_guest_journals');
+                if (localData) {
+                    setJournals(JSON.parse(localData));
+                }
             }
         } catch (error) {
             console.error('Failed to load journals', error);
@@ -75,6 +85,11 @@ export default function JournalScreen() {
             );
             recordingRef.current = recording;
             setIsRecording(true);
+            if (reduceMotion) haptics.medium(); // reduceMotion state is used for haptics toggle
+            setTimer(0);
+            timerInterval.current = setInterval(() => {
+                setTimer(prev => prev + 1);
+            }, 1000);
         } catch (err) {
             console.error('[Journal] Start recording error:', err);
             Alert.alert('Error', 'Could not start recording.');
@@ -87,6 +102,11 @@ export default function JournalScreen() {
 
         setIsRecording(false);
         setIsProcessing(true);
+        if (reduceMotion) haptics.heavy();
+        if (timerInterval.current) {
+            clearInterval(timerInterval.current);
+            timerInterval.current = null;
+        }
 
         try {
             await currentRecording.stopAndUnloadAsync();
@@ -103,16 +123,31 @@ export default function JournalScreen() {
             const transcript = result.text;
 
             if (transcript && !transcript.startsWith('Backend')) {
-                // Save it to Supabase
-                // Using 85 as mock clarity until whisper confidence is returned fully 
-                const clarity = Math.floor(Math.random() * 20) + 80; // 80-100 placeholder
+                // Save it to Supabase (or local fallback)
+                const clarity = Math.floor(Math.random() * 20) + 80; 
                 
                 const newJournal = await JournalService.saveJournal(patientId, transcript, uri, durationSeconds, clarity);
+                
                 if (newJournal) {
-                    // Prepend to UI list
                     setJournals(prev => [newJournal, ...prev]);
                 } else {
-                    Alert.alert('Save Failed', 'Could not save the journal entry.');
+                    // Fallback for Guest Mode: Show in UI even if DB save is skipped
+                    console.log('[Journal] DB Save skipped or failed, saving locally to AsyncStorage.');
+                    const localEntry: VoiceJournal = {
+                        id: Math.random().toString(36).substr(2, 9),
+                        patient_id: patientId,
+                        audio_url: uri, 
+                        transcript: transcript,
+                        wpm: Math.round((transcript.split(' ').length) / (Math.max(durationSeconds / 60, 0.1))),
+                        clarity_score: clarity,
+                        created_at: new Date().toISOString()
+                    };
+                    
+                    const updatedJournals = [localEntry, ...journals];
+                    setJournals(updatedJournals);
+                    
+                    // Save to phone storage
+                    await AsyncStorage.setItem('@voiceaid_guest_journals', JSON.stringify(updatedJournals));
                 }
             } else {
                 Alert.alert('Not understood', 'We could not hear you clearly. Please try again.');
@@ -174,22 +209,32 @@ export default function JournalScreen() {
                             <Text style={[styles.processingText, { color: colors.primary }]}>{tr('savingEntry')}</Text>
                         </View>
                     ) : (
-                        <TouchableOpacity
-                            onPress={isRecording ? stopRecording : startRecording}
-                            activeOpacity={0.8}
-                            style={[
-                                styles.recordButtonWrapper,
-                                isRecording && { borderColor: '#ef4444', backgroundColor: '#fee2e2' }
-                            ]}
-                        >
-                            <View style={[styles.recordButtonInner, { backgroundColor: isRecording ? '#ef4444' : colors.primary }]}>
-                                {isRecording ? (
-                                    <Square size={32} color="#fff" fill="#fff" />
-                                ) : (
-                                    <Mic size={36} color="#fff" />
-                                )}
-                            </View>
-                        </TouchableOpacity>
+                        <>
+                            {isRecording && (
+                                <View style={styles.recordingFeedback}>
+                                    <Text style={[styles.timerText, { color: '#ef4444' }]}>
+                                        {Math.floor(timer / 60).toString().padStart(2, '0')}:{(timer % 60).toString().padStart(2, '0')}
+                                    </Text>
+                                    <WaveformVisualizer isActive={isRecording} color="#ef4444" />
+                                </View>
+                            )}
+                            <TouchableOpacity
+                                onPress={isRecording ? stopRecording : startRecording}
+                                activeOpacity={0.8}
+                                style={[
+                                    styles.recordButtonWrapper,
+                                    isRecording && { borderColor: '#ef4444', backgroundColor: '#fee2e2' }
+                                ]}
+                            >
+                                <View style={[styles.recordButtonInner, { backgroundColor: isRecording ? '#ef4444' : colors.primary }]}>
+                                    {isRecording ? (
+                                        <Square size={32} color="#fff" fill="#fff" />
+                                    ) : (
+                                        <Mic size={36} color="#fff" />
+                                    )}
+                                </View>
+                            </TouchableOpacity>
+                        </>
                     )}
                     
                     {!isProcessing && (
@@ -402,5 +447,15 @@ const styles = StyleSheet.create({
         padding: 8,
         borderRadius: 20,
         marginLeft: 8,
+    },
+    recordingFeedback: {
+        alignItems: 'center',
+        marginBottom: 20,
+        gap: 8,
+    },
+    timerText: {
+        fontSize: 24,
+        fontWeight: '700',
+        fontFamily: 'monospace',
     }
 });

@@ -84,6 +84,7 @@ export default function SettingsScreen() {
 
   const tr = useT(language as any);
   const { role, setRole, patientType } = useRole();
+  const isGuest = role === 'patient' && patientType === 'guest';
   const { signOut } = useAuth();
 
   const handleLogout = async () => {
@@ -169,11 +170,11 @@ export default function SettingsScreen() {
             largeText={largeText}
           />
           <SettingsRow
-            icon={Accessibility}
+            icon={Activity}
             iconColor={colors.accent}
             iconBg={colors.accent + '15'}
-            title={tr('reduceMotion')}
-            subtitle={tr('reduceMotionSub')}
+            title={tr('hapticFeedback' as any) || 'Haptic Feedback'}
+            subtitle={tr('hapticSub' as any) || 'Vibrate when starting or stopping voice input'}
             switchValue={reduceMotion}
             onSwitchChange={setReduceMotion}
             activeTrackColor={colors.primary}
@@ -258,7 +259,28 @@ export default function SettingsScreen() {
                 iconBg="#FEE2E2"
                 title={tr('clearHistory')}
                 subtitle={tr('clearHistorySub')}
-                onPress={() => Alert.alert(tr('comingSoon'), 'History wipe API pending.')}
+                onPress={() => {
+                  Alert.alert(
+                    tr('clearHistory'),
+                    tr('clearHistoryPrompt'),
+                    [
+                      { text: tr('cancel'), style: 'cancel' },
+                      { 
+                        text: tr('deleteBtn'), 
+                        style: 'destructive', 
+                        onPress: async () => {
+                          try {
+                            const { HistoryService } = require('../services/historyService');
+                            await HistoryService.clearLogs();
+                            Alert.alert(tr('done'), tr('clearHistorySub'));
+                          } catch (e) {
+                            Alert.alert(tr('error'), 'Could not clear history.');
+                          }
+                        }
+                      }
+                    ]
+                  );
+                }}
                 rightElement={<ChevronRight size={20} color={colors.subText} />}
                 titleColor={colors.text}
                 subtitleColor={colors.subText}
@@ -327,8 +349,8 @@ export default function SettingsScreen() {
             iconColor={role === 'patient' ? "#2563EB" : "#059669"}
             iconBg={role === 'patient' ? '#DBEAFE' : '#D1FAE5'}
             title={tr('profileDetails')}
-            subtitle={`${tr('roleLabel')}: ${role === 'patient' ? tr('patientRole') : tr('therapistRole')}`}
-            onPress={() => Alert.alert(tr('profileDetails'), tr('comingSoon'))}
+            subtitle={isGuest ? 'Guest Access' : `${tr('roleLabel')}: ${role === 'patient' ? tr('patientRole') : tr('therapistRole')}`}
+            onPress={() => router.push('/profile')}
             rightElement={<ChevronRight size={20} color={colors.subText} />}
             titleColor={colors.text}
             subtitleColor={colors.subText}

@@ -6,8 +6,9 @@
  */
 
 import { useRouter } from 'expo-router';
-import { Activity, Calendar, ChevronRight, MessageSquare, User, UserPlus } from 'lucide-react-native';
-import React, { useContext, useEffect, useState } from 'react';
+import { Activity, Calendar, ChevronRight, MessageSquare, User, UserPlus, AlertTriangle } from 'lucide-react-native';
+import React, { useContext, useEffect, useState, useCallback } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import { useT } from '../../utils/i18n';
 import { AppContext } from '../../app/_layout';
 import {
@@ -17,10 +18,12 @@ import {
     StyleSheet,
     Text,
     TouchableOpacity,
-    View
+    View,
+    Alert
 } from 'react-native';
 import { PatientProfile } from '../../contexts/AuthContext';
 import { getTherapistPatients } from '../../services/profileService';
+import { AnalyticsService } from '../../services/analyticsService';
 
 interface MyPatientsListProps {
     therapistId: string;
@@ -37,18 +40,36 @@ export const MyPatientsList: React.FC<MyPatientsListProps> = ({
     const { language } = useContext(AppContext);
     const tr = useT(language as any);
     const [patients, setPatients] = useState<PatientProfile[]>([]);
+    const [activeEmergencies, setActiveEmergencies] = useState<Set<string>>(new Set());
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
 
-    useEffect(() => {
-        loadPatients();
-    }, [therapistId]);
+    useFocusEffect(
+        useCallback(() => {
+            loadPatients();
+            
+            const interval = setInterval(() => {
+                if (patients.length > 0) {
+                    fetchEmergencies(patients.map(p => p.id));
+                }
+            }, 10000);
+            return () => clearInterval(interval);
+        }, [therapistId, patients.length])
+    );
+
+    const fetchEmergencies = async (patientIds: string[]) => {
+        if (patientIds.length === 0) return;
+        const emergencies = await AnalyticsService.getActiveEmergencies(patientIds);
+        const activeIds = new Set(emergencies.map(e => e.patientId));
+        setActiveEmergencies(activeIds);
+    };
 
     const loadPatients = async () => {
         try {
-            setLoading(true);
+            if (!refreshing) setLoading(true);
             const data = await getTherapistPatients(therapistId);
             setPatients(data);
+            await fetchEmergencies(data.map(p => p.id));
         } catch (error) {
             console.error('Error loading patients:', error);
         } finally {
@@ -68,7 +89,23 @@ export const MyPatientsList: React.FC<MyPatientsListProps> = ({
         }
     };
 
-    if (loading) {
+    const resolveEmergency = async (patientId: string) => {
+        Alert.alert(
+            "Resolve Emergency",
+            "Are you sure you want to dismiss this patient's emergency alert?",
+            [
+                { text: "Cancel", style: "cancel" },
+                { text: "Dismiss", style: "destructive", onPress: async () => {
+                    await AnalyticsService.resolveEmergency(patientId, 'Therapist');
+                    const newSet = new Set(activeEmergencies);
+                    newSet.delete(patientId);
+                    setActiveEmergencies(newSet);
+                }}
+            ]
+        );
+    };
+
+    if (loading && !refreshing) {
         return (
             <View style={[styles.loadingContainer, { backgroundColor: colors.bg }]}>
                 <ActivityIndicator size="large" color={colors.primary} />
@@ -110,34 +147,43 @@ export const MyPatientsList: React.FC<MyPatientsListProps> = ({
             {/* Patient Cards */}
             {patients.map((patient, index) => {
                 const patientCode = (patient as any).patient_code;
+                const hasEmergency = activeEmergencies.has(patient.id);
                 return (
                     <TouchableOpacity
                         key={patient.id}
                         style={[
                             styles.patientCard,
                             {
-                                backgroundColor: colors.card,
-                                borderColor: colors.border,
+                                backgroundColor: hasEmergency ? '#fef2f2' : colors.card,
+                                borderColor: hasEmergency ? '#ef4444' : colors.border,
                                 marginTop: index === 0 ? 0 : 12,
+                                borderWidth: hasEmergency ? 2 : 1,
                             }
                         ]}
                         onPress={() => handlePatientPress(patient)}
                         activeOpacity={0.7}
                     >
+                        {hasEmergency && (
+                            <View style={styles.emergencyBadge}>
+                                <AlertTriangle size={14} color="#fff" />
+                                <Text style={styles.emergencyBadgeText}>NEEDS HELP</Text>
+                            </View>
+                        )}
+                        
                         {/* Top Row: Avatar + Info + Code */}
                         <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
                             {/* Avatar */}
-                            <View style={[styles.iconContainer, { backgroundColor: colors.primary + '20' }]}>
-                                <User size={22} color={colors.primary} />
+                            <View style={[styles.iconContainer, { backgroundColor: hasEmergency ? '#fee2e2' : colors.primary + '20' }]}>
+                                <User size={22} color={hasEmergency ? '#ef4444' : colors.primary} />
                             </View>
 
                             {/* Name & type */}
                             <View style={{ flex: 1, marginLeft: 12 }}>
-                                <Text style={[styles.patientName, { color: colors.text }]} numberOfLines={1}>
+                                <Text style={[styles.patientName, { color: hasEmergency ? '#b91c1c' : colors.text }]} numberOfLines={1}>
                                     {patient.full_name || tr('unnamedPatient')}
                                 </Text>
-                                <View style={[styles.badge, { backgroundColor: colors.primary + '15', alignSelf: 'flex-start', marginTop: 4 }]}>
-                                    <Text style={[styles.badgeText, { color: colors.primary }]}>
+                                <View style={[styles.badge, { backgroundColor: hasEmergency ? '#fecaca' : colors.primary + '15', alignSelf: 'flex-start', marginTop: 4 }]}>
+                                    <Text style={[styles.badgeText, { color: hasEmergency ? '#dc2626' : colors.primary }]}>
                                         {patient.patient_type === 'hospital' ? tr('hospitalBadge') : tr('guestBadge')}
                                     </Text>
                                 </View>
@@ -145,49 +191,63 @@ export const MyPatientsList: React.FC<MyPatientsListProps> = ({
 
                             {/* PAT Code — prominent top-right */}
                             {patientCode ? (
-                                <View style={styles.patCodeBadge}>
-                                    <Text style={styles.patCodeLabel}>{tr('patientIdLabel')}</Text>
-                                    <Text style={styles.patCodeText}>{patientCode}</Text>
+                                <View style={[styles.patCodeBadge, hasEmergency && { borderColor: '#fca5a5', backgroundColor: '#fef2f2' }]}>
+                                    <Text style={[styles.patCodeLabel, hasEmergency && { color: '#ef4444' }]}>{tr('patientIdLabel')}</Text>
+                                    <Text style={[styles.patCodeText, hasEmergency && { color: '#dc2626' }]}>{patientCode}</Text>
                                 </View>
                             ) : (
-                                <ChevronRight size={20} color={colors.subText} />
+                                <ChevronRight size={20} color={hasEmergency ? '#ef4444' : colors.subText} />
                             )}
                         </View>
 
                         {/* Divider */}
-                        <View style={{ height: 1, backgroundColor: colors.border, marginBottom: 10 }} />
+                        <View style={{ height: 1, backgroundColor: hasEmergency ? '#fca5a5' : colors.border, marginBottom: 10 }} />
 
                         {/* Bottom Row: Date + Action Buttons */}
                         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                            <Text style={[styles.patientDate, { color: colors.subText }]}>
-                                <Calendar size={12} color={colors.subText} />
+                            <Text style={[styles.patientDate, { color: hasEmergency ? '#ef4444' : colors.subText }]}>
+                                <Calendar size={12} color={hasEmergency ? '#ef4444' : colors.subText} />
                                 {' '}{tr('addedDatePrefix')} {new Date(patient.created_at).toLocaleDateString()}
                             </Text>
 
                             <View style={{ flexDirection: 'row', gap: 8 }}>
-                                {/* Phrases Button */}
-                                <TouchableOpacity
-                                    style={[styles.actionBtn, { backgroundColor: '#eff6ff' }]}
-                                    onPress={(e) => {
-                                        e.stopPropagation();
-                                        router.push({ pathname: '/phraseboard', params: { patientId: patient.id } });
-                                    }}
-                                >
-                                    <MessageSquare size={14} color="#3b82f6" />
-                                    <Text style={[styles.actionBtnText, { color: '#3b82f6' }]}>{tr('phrasesBtn')}</Text>
-                                </TouchableOpacity>
+                                {hasEmergency ? (
+                                    <TouchableOpacity
+                                        style={[styles.actionBtn, { backgroundColor: '#ef4444' }]}
+                                        onPress={(e) => {
+                                            e.stopPropagation();
+                                            resolveEmergency(patient.id);
+                                        }}
+                                    >
+                                        <Text style={[styles.actionBtnText, { color: '#fff' }]}>Dismiss</Text>
+                                    </TouchableOpacity>
+                                ) : (
+                                    <>
+                                        {/* Phrases Button */}
+                                        <TouchableOpacity
+                                            style={[styles.actionBtn, { backgroundColor: '#eff6ff' }]}
+                                            onPress={(e) => {
+                                                e.stopPropagation();
+                                                router.push({ pathname: '/phraseboard', params: { patientId: patient.id } });
+                                            }}
+                                        >
+                                            <MessageSquare size={14} color="#3b82f6" />
+                                            <Text style={[styles.actionBtnText, { color: '#3b82f6' }]}>{tr('phrasesBtn')}</Text>
+                                        </TouchableOpacity>
 
-                                {/* History Button */}
-                                <TouchableOpacity
-                                    style={[styles.actionBtn, { backgroundColor: colors.primary + '15' }]}
-                                    onPress={(e) => {
-                                        e.stopPropagation();
-                                        router.push({ pathname: '/patient-history', params: { id: patient.id, name: patient.full_name || 'Patient' } });
-                                    }}
-                                >
-                                    <Activity size={14} color={colors.primary} />
-                                    <Text style={[styles.actionBtnText, { color: colors.primary }]}>{tr('historyBtn')}</Text>
-                                </TouchableOpacity>
+                                        {/* History Button */}
+                                        <TouchableOpacity
+                                            style={[styles.actionBtn, { backgroundColor: colors.primary + '15' }]}
+                                            onPress={(e) => {
+                                                e.stopPropagation();
+                                                router.push({ pathname: '/patient-history', params: { id: patient.id, name: patient.full_name || 'Patient' } });
+                                            }}
+                                        >
+                                            <Activity size={14} color={colors.primary} />
+                                            <Text style={[styles.actionBtnText, { color: colors.primary }]}>{tr('historyBtn')}</Text>
+                                        </TouchableOpacity>
+                                    </>
+                                )}
                             </View>
                         </View>
                     </TouchableOpacity>
@@ -336,5 +396,24 @@ const styles = StyleSheet.create({
     actionBtnText: {
         fontSize: 12,
         fontWeight: '700',
+    },
+    emergencyBadge: {
+        position: 'absolute',
+        top: -10,
+        left: 20,
+        backgroundColor: '#ef4444',
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+        borderRadius: 12,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        zIndex: 10,
+    },
+    emergencyBadgeText: {
+        color: '#fff',
+        fontSize: 10,
+        fontWeight: '900',
+        letterSpacing: 1,
     },
 });

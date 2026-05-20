@@ -48,7 +48,8 @@ export const PatientDashboard: React.FC<PatientDashboardProps> = ({
         { id: 'journal', route: '/journal' },
         ...(patientType === 'hospital' ? [{ id: 'my-assignments', route: '/my-assignments' }] : []),
         { id: 'history', route: '/history' },
-        { id: 'settings', route: '/settings' }
+        { id: 'settings', route: '/settings' },
+        { id: 'emergency-sos', route: '/emergency-sos' }
     ];
 
     useEffect(() => {
@@ -83,7 +84,8 @@ export const PatientDashboard: React.FC<PatientDashboardProps> = ({
             'journal': tr('voiceJournal'),
             'my-assignments': tr('myAssignments'),
             'history': tr('history'),
-            'settings': tr('settings')
+            'settings': tr('settings'),
+            'emergency-sos': tr('emergencySOSTitle')
         };
         
         const speedMapping: any = { slow: 0.8, normal: 1.0, fast: 1.2 };
@@ -399,20 +401,18 @@ export const PatientDashboard: React.FC<PatientDashboardProps> = ({
 
 
 
-                        {/* Emergency SOS (Guest only) */}
-                        {patientType === 'guest' && (
-                            <TouchableOpacity
-                                onPress={() => router.push('/emergency-sos')}
-                                activeOpacity={0.8}
-                                style={[styles.toolCard, { borderColor: '#fca5a5' }]}
-                            >
-                                <View style={[styles.toolIcon, { backgroundColor: '#fef2f2' }]}>
-                                    <Phone size={24} color="#ef4444" strokeWidth={2} />
-                                </View>
-                                <Text style={[styles.toolText, { color: '#ef4444' }]}>{tr('emergencySOS')}</Text>
-                                <Text style={styles.toolSubText}>{tr('callForHelp')}</Text>
-                            </TouchableOpacity>
-                        )}
+                        {/* Clinical Priority Alert (All Patients) */}
+                        <TouchableOpacity
+                            onPress={() => router.push('/emergency-sos')}
+                            activeOpacity={0.8}
+                            style={[styles.toolCard, { borderColor: '#fca5a5' }]}
+                        >
+                            <View style={[styles.toolIcon, { backgroundColor: '#fef2f2' }]}>
+                                <Phone size={24} color="#ef4444" strokeWidth={2} />
+                            </View>
+                            <Text style={[styles.toolText, { color: '#ef4444' }]}>{tr('emergencySOSTitle')}</Text>
+                            <Text style={styles.toolSubText}>{tr('callForHelpSub')}</Text>
+                        </TouchableOpacity>
                     </View>
                 </View>
 

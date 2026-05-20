@@ -17,6 +17,7 @@ import { LiveTranscriptionDisplay } from '../components/ui/LiveTranscriptionDisp
 import { TranscriptMessage } from '../components/ui/TranscriptMessage';
 import { WaveformVisualizer } from '../components/ui/WaveformVisualizer';
 import { useRole } from '../contexts/RoleContext';
+import { useAuth } from '../contexts/AuthContext';
 import { ASRService } from '../services/asr';
 import { streamingASRService } from '../services/asr/streaming';
 import { AnalyticsService } from '../services/analyticsService';
@@ -28,6 +29,7 @@ import { TTSService } from '../services/tts';
 import { SupportedTTSLanguage } from '../services/tts/config';
 import { haptics } from '../utils/haptics';
 import { AppContext } from './_layout';
+import { supabase } from '../lib/supabase';
 
 const Header = ({ title, onBack, onShare, colors }: { title: string, onBack: () => void, onShare?: () => void, colors: any }) => {
   return (
@@ -57,7 +59,7 @@ interface Message {
 
 export default function TranscriptionScreen() {
   const router = useRouter();
-  const { colors, language } = useContext(AppContext);
+  const { colors, language, reduceMotion: hapticEnabled } = useContext(AppContext);
   const { role } = useRole();
   const t = getTranslationsSync(language as Language);
   const scrollViewRef = useRef<ScrollView>(null);
@@ -90,6 +92,11 @@ export default function TranscriptionScreen() {
   const [predictions, setPredictions] = useState<Prediction[]>([]);
   const [selectedPrediction, setSelectedPrediction] = useState<string | null>(null);
   const predictionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Caregiver Patient Selection
+  const { therapistProfile } = useAuth();
+  const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
+  const [assignedPatients, setAssignedPatients] = useState<{id: string, name: string}[]>([]);
 
   // Trigger predictions whenever the live transcript changes (with 1.2s debounce)
   useEffect(() => {
@@ -151,6 +158,27 @@ export default function TranscriptionScreen() {
       setHasPlayedWelcome(true);
     }
   }, []);
+
+  useEffect(() => {
+    if (role === 'caregiver' && therapistProfile?.assigned_patients) {
+        loadAssignedPatients();
+    }
+  }, [role, therapistProfile]);
+
+  const loadAssignedPatients = async () => {
+      try {
+          const { data } = await supabase
+              .from('patient_profiles')
+              .select('user_id, full_name')
+              .in('user_id', therapistProfile.assigned_patients || []);
+          if (data) {
+              setAssignedPatients(data.map(p => ({ id: p.user_id, name: p.full_name || 'Unnamed' })));
+              if (data.length > 0) setSelectedPatientId(data[0].user_id);
+          }
+      } catch (e) {
+          console.error('Failed to load assigned patients', e);
+      }
+  };
 
   const playWelcomeMessage = async () => {
     try {
@@ -284,11 +312,12 @@ export default function TranscriptionScreen() {
 
         setMessages(prev => [...prev, newMessage]);
 
-        // Save to history
+        // Save to history (attribute to selected patient if caregiver)
         await HistoryService.saveTranscription({
           text: result.text,
           detectedLanguage: result.detectedLanguage || language as string,
           timestamp: new Date().toISOString(),
+          targetUserId: selectedPatientId || undefined // Pass the target patient ID
         });
 
         // Scroll to bottom
@@ -311,7 +340,7 @@ export default function TranscriptionScreen() {
       setIsStreaming(true);
       isStreamingRef.current = true;
       sessionStartRef.current = Date.now();
-      haptics.medium();
+      if (hapticEnabled) haptics.medium();
       setLiveTranscript('');
       setLivePredictedTranscript('');
       setConnectionState('connecting');
@@ -472,7 +501,7 @@ export default function TranscriptionScreen() {
         language: language as string,
         mode: 'streaming',
       });
-      haptics.success();
+      if (hapticEnabled) haptics.success();
 
       setLiveTranscript('');
       setLivePredictedTranscript('');
@@ -489,7 +518,7 @@ export default function TranscriptionScreen() {
       Alert.alert('Nothing to share', 'Record a session first.');
       return;
     }
-    haptics.light();
+    if (hapticEnabled) haptics.light();
     const lines = messages.map(m => {
       const prefix = m.type === 'user' ? '🗣️ Patient' : '🤖 System';
       const predicted = m.predictedText ? `\n   → Predicted: "${m.predictedText}"` : '';
@@ -504,6 +533,27 @@ export default function TranscriptionScreen() {
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]}>
       <Header title={t.transcript.title} onBack={() => router.back()} onShare={handleShareTranscript} colors={colors} />
+
+      {/* Caregiver Patient Selector */}
+      {role === 'caregiver' && assignedPatients.length > 0 && (
+          <View style={[styles.patientSelector, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
+              <Text style={[styles.selectorLabel, { color: colors.subText }]}>ASSISTING PATIENT:</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.patientsRow}>
+                  {assignedPatients.map(p => (
+                      <TouchableOpacity 
+                          key={p.id} 
+                          onPress={() => setSelectedPatientId(p.id)}
+                          style={[
+                              styles.patientPill, 
+                              selectedPatientId === p.id ? { backgroundColor: colors.primary } : { backgroundColor: colors.bg, borderColor: colors.border }
+                          ]}
+                      >
+                          <Text style={[styles.patientPillText, { color: selectedPatientId === p.id ? '#FFF' : colors.text }]}>{p.name}</Text>
+                      </TouchableOpacity>
+                  ))}
+              </ScrollView>
+          </View>
+      )}
 
       <ScrollView
         ref={scrollViewRef}
@@ -649,7 +699,7 @@ export default function TranscriptionScreen() {
             (recording || isStreaming) && [styles.micButtonActive, { backgroundColor: colors.danger, shadowColor: colors.danger }],
           ]}
           onPress={() => {
-            haptics.medium();
+            if (hapticEnabled) haptics.medium();
             if (isLiveMode) {
               isStreaming ? stopLiveTranscription() : startLiveTranscription();
             } else {
@@ -925,5 +975,31 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     fontSize: 13,
   },
+  patientSelector: {
+      padding: 12,
+      borderBottomWidth: 1,
+      backgroundColor: '#fff',
+  },
+  selectorLabel: {
+      fontSize: 10,
+      fontWeight: 'bold',
+      marginBottom: 8,
+      marginLeft: 4,
+      letterSpacing: 1,
+  },
+  patientsRow: {
+      gap: 8,
+      paddingRight: 16,
+  },
+  patientPill: {
+      paddingHorizontal: 14,
+      paddingVertical: 6,
+      borderRadius: 20,
+      borderWidth: 1,
+  },
+  patientPillText: {
+      fontSize: 13,
+      fontWeight: '600',
+  }
 });
 

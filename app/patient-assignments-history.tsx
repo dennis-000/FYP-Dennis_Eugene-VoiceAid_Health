@@ -12,6 +12,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { GoalCategory, GoalService, PatientGoal } from '../services/goalService';
 import { AppContext } from './_layout';
+import { useT } from '../utils/i18n';
 
 const CATEGORY_LABELS: Record<GoalCategory, string> = {
     communication: 'Communication',
@@ -34,7 +35,8 @@ const CATEGORY_COLORS: Record<GoalCategory, string> = {
 export default function PatientAssignmentsHistoryScreen() {
     const router = useRouter();
     const params = useLocalSearchParams();
-    const { colors } = useContext(AppContext);
+    const { colors, language } = useContext(AppContext);
+    const tr = useT(language as any);
 
     const patientId = params.id as string;
     const patientName = params.name as string || 'Patient';
@@ -166,7 +168,12 @@ export default function PatientAssignmentsHistoryScreen() {
                                                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4, flexWrap: 'wrap' }}>
                                                         <View style={[styles.catPill, { backgroundColor: CATEGORY_COLORS[goal.category] + '20' }]}>
                                                             <Text style={{ fontSize: 10, fontWeight: '700', color: CATEGORY_COLORS[goal.category] }}>
-                                                                {CATEGORY_LABELS[goal.category]}
+                                                                {(() => {
+                                                                    const cat = goal.category;
+                                                                    const catKey = `cat${cat.charAt(0).toUpperCase()}${cat.slice(1).replace(/_([a-z])/g, (_, m) => m.toUpperCase())}`;
+                                                                    const translatedCat = tr(catKey as any);
+                                                                    return translatedCat && translatedCat !== catKey ? translatedCat : CATEGORY_LABELS[cat];
+                                                                })()}
                                                             </Text>
                                                         </View>
                                                         {goal.requires_recording && (
@@ -178,11 +185,11 @@ export default function PatientAssignmentsHistoryScreen() {
                                                     </View>
                                                     
                                                     <Text style={[styles.goalTitle, { color: colors.text, textDecorationLine: goal.completed ? 'line-through' : 'none', opacity: goal.completed ? 0.6 : 1 }]}>
-                                                        {goal.title}
+                                                        {tr.translateText(goal.title)}
                                                     </Text>
                                                     
                                                     {goal.description ? (
-                                                        <Text style={[styles.goalDesc, { color: colors.subText }]}>{goal.description}</Text>
+                                                        <Text style={[styles.goalDesc, { color: colors.subText }]}>{tr.translateText(goal.description)}</Text>
                                                     ) : null}
 
                                                     {/* Patient's Voice Transcript Log */}
@@ -190,7 +197,9 @@ export default function PatientAssignmentsHistoryScreen() {
                                                         <View style={[styles.transcriptBox, { borderColor: '#22c55e50', backgroundColor: '#f0fdf4' }]}>
                                                             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 2 }}>
                                                                 <Clock size={12} color="#16a34a" />
-                                                                <Text style={{ fontSize: 11, color: '#16a34a', fontWeight: '700' }}>Patient Said:</Text>
+                                                                <Text style={{ fontSize: 11, color: '#16a34a', fontWeight: '700' }}>
+                                                                    {tr('patientSaid').replace('🎤 ', '')}
+                                                                </Text>
                                                             </View>
                                                             <Text style={{ fontSize: 13, color: '#15803d', fontStyle: 'italic' }}>
                                                                 "{goal.voice_transcript}"

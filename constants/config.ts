@@ -4,8 +4,8 @@
  * USING GOOGLE COLAB BACKEND FOR FAST TRANSCRIPTION
  */
 
-// Google Colab Backend (via Cloudflare tunnel)
-export const API_BASE_URL = 'https://sequences-home-santa-sticker.trycloudflare.com';
+// Permanent Modal.dev Serverless GPU Backend
+export const API_BASE_URL = 'https://dennis-000--voiceaid-health-fastapi-app.modal.run';
 
 // Update endpoints to use the new Colab API surface
 export const ENDPOINTS = {

@@ -26,7 +26,6 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRole } from '../contexts/RoleContext';
 import { createPatientProfile } from '../services/profileService';
-import { NotificationService } from '../services/notificationService';
 import { supabase } from '../lib/supabase';
 import { AppContext } from './_layout';
 import { useT } from '../utils/i18n';
@@ -72,11 +71,6 @@ export default function HospitalConnectScreen() {
         await AsyncStorage.setItem('@voiceaid_patient_name', patient.full_name || '');
         await AsyncStorage.setItem('@voiceaid_patient_code', patient.patient_code || '');
 
-        const hasPermission = await NotificationService.requestPermission();
-        if (hasPermission) {
-            await NotificationService.scheduleDailyAssignmentReminder(9, 0, patient.full_name || '');
-        }
-
         await setRole('patient');
         await setPatientType('hospital');
 
@@ -119,6 +113,9 @@ export default function HospitalConnectScreen() {
             );
 
             if (!patient) throw new Error('Could not create patient profile.');
+
+            // 3. Link patient to therapist's assigned list (CRITICAL for dashboard visibility)
+            await assignPatientToTherapist(therapist.id, patient.id);
 
             await bindPatient(patient, true);
         } catch (e: any) {

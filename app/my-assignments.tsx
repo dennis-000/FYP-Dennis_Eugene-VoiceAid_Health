@@ -205,9 +205,9 @@ export default function MyAssignmentsScreen() {
             return;
         }
         setSpeakingId(goal.id);
-        const text = goal.description
-            ? `${goal.title}. ${goal.description}`
-            : goal.title;
+        const translatedTitle = tr.translateText(goal.title);
+        const translatedDesc = goal.description ? tr.translateText(goal.description) : '';
+        const text = translatedDesc ? `${translatedTitle}. ${translatedDesc}` : translatedTitle;
         await TTSService.speak(text, language as any);
         // expo-speech doesn't provide completion callback reliably, so clear after a delay
         setTimeout(() => setSpeakingId(null), (text.length / 12) * 1000 + 1000);
@@ -242,7 +242,7 @@ export default function MyAssignmentsScreen() {
 
             if (!uri) throw new Error('No audio URI');
 
-            const result = await ASRService.processAudio(uri, language === 'twi' ? 'twi' : 'en');
+            const result = await ASRService.processAudio(uri, language === 'twi' ? 'twi' : language === 'ga' ? 'ga' : 'en');
             const text = result.text;
 
             if (text && !text.startsWith('Backend')) {
@@ -257,9 +257,15 @@ export default function MyAssignmentsScreen() {
                     ));
                 }
                 // Read back what was transcribed
-                await TTSService.speak(language === 'twi' ? `Mete: ${text}` : `I heard: ${text}`, language as any);
+                const heardMsg = language === 'twi' ? `Mete: ${text}` : language === 'ga' ? `Minu: ${text}` : `I heard: ${text}`;
+                await TTSService.speak(heardMsg, language as any);
             } else {
-                await TTSService.speak(language === 'twi' ? "Mente yie. San bɔ." : "Sorry, I couldn't hear that clearly. Please try again.", language as any);
+                const failMsg = language === 'twi' 
+                    ? "Mente yie. San bɔ." 
+                    : language === 'ga' 
+                        ? "Minuu jogbaŋŋ. Ka he eko." 
+                        : "Sorry, I couldn't hear that clearly. Please try again.";
+                await TTSService.speak(failMsg, language as any);
             }
         } catch (err) {
             console.error('[Assignments ASR] Stop error:', err);
@@ -407,7 +413,11 @@ export default function MyAssignmentsScreen() {
                                         <Ionicons name={CATEGORY_ICONS[cat] as any} size={16} color={CATEGORY_COLORS[cat]} />
                                     </View>
                                     <Text style={[styles.catTitle, { color: colors.text }]}>
-                                        {CATEGORY_LABELS[cat]}
+                                        {(() => {
+                                            const catKey = `cat${cat.charAt(0).toUpperCase()}${cat.slice(1).replace(/_([a-z])/g, (_, m) => m.toUpperCase())}`;
+                                            const translatedCat = tr(catKey as any);
+                                            return translatedCat && translatedCat !== catKey ? translatedCat : CATEGORY_LABELS[cat];
+                                        })()}
                                     </Text>
                                     <Text style={[styles.catCount, { color: colors.subText }]}>
                                         {grouped[cat].filter(g => g.completed).length}/{grouped[cat].length}
@@ -447,11 +457,11 @@ export default function MyAssignmentsScreen() {
                                                     { color: colors.text },
                                                     goal.completed && { textDecorationLine: 'line-through', color: colors.subText }
                                                 ]}>
-                                                    {goal.title}
+                                                    {tr.translateText(goal.title)}
                                                 </Text>
                                                 {goal.description ? (
                                                     <Text style={[styles.goalDesc, { color: colors.subText }]}>
-                                                        {goal.description}
+                                                        {tr.translateText(goal.description)}
                                                     </Text>
                                                 ) : null}
 

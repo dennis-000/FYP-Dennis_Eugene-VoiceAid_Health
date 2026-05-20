@@ -14,22 +14,21 @@ import { Audio } from 'expo-av';
  * Optimized recording options for speech-impaired users
  * These settings prioritize clarity and noise reduction
  */
-export const ENHANCED_RECORDING_OPTIONS = {
+export const ENHANCED_RECORDING_OPTIONS: Audio.RecordingOptions = {
     android: {
-        extension: '.m4a',
+        extension: '.wav',
         outputFormat: Audio.AndroidOutputFormat.MPEG_4,
         audioEncoder: Audio.AndroidAudioEncoder.AAC,
-        sampleRate: 16000, 
-        numberOfChannels: 1, 
-        bitRate: 256000, // Higher bitrate = better audio quality for model
+        sampleRate: 44100,
+        numberOfChannels: 1,
+        bitRate: 256000,
     },
     ios: {
         extension: '.wav',
-        outputFormat: Audio.IOSOutputFormat.LINEARPCM,
-        audioQuality: Audio.IOSAudioQuality.MAX,
-        sampleRate: 16000, 
+        audioQuality: Audio.IOSAudioQuality.HIGH,
+        sampleRate: 44100,
         numberOfChannels: 1,
-        bitRate: 128000,
+        bitRate: 256000,
         linearPCMBitDepth: 16,
         linearPCMIsBigEndian: false,
         linearPCMIsFloat: false,

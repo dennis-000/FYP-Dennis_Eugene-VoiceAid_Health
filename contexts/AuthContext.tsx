@@ -81,6 +81,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             }
 
             setLoading(false);
+        }).catch((error) => {
+            console.error('Auth initialization error:', error);
+            setLoading(false);
         });
 
         // Listen for auth changes
@@ -133,6 +136,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             }
 
             setTherapistProfile(data);
+
+            // Register for Push Notifications (Background Alerts)
+            const { NotificationService } = await import('../services/notificationService');
+            const token = await NotificationService.registerForPushNotificationsAsync();
+            if (token && data.id) {
+                await NotificationService.saveTokenToBackend(data.id, token);
+            }
         } catch (error) {
             console.error('Error loading therapist profile:', error);
         }
@@ -153,6 +163,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             }
 
             setPatientProfile(data);
+            
+            // Register for Push Notifications (Background Alerts) for patients
+            const { NotificationService } = await import('../services/notificationService');
+            const token = await NotificationService.registerForPushNotificationsAsync();
+            if (token && data.id) {
+                await NotificationService.savePatientTokenToBackend(data.id, token);
+            }
         } catch (error) {
             console.error('Error loading patient profile:', error);
         }
