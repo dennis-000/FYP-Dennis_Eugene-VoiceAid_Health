@@ -1,4 +1,4 @@
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import { supabase } from '../lib/supabase';
 
 export interface VoiceJournal {
@@ -84,15 +84,23 @@ export const JournalService = {
         clarityScore: number = 85 // Default or calculated by Whisper
     ): Promise<VoiceJournal | null> => {
         try {
+            // 1. Only attempt Supabase save if we have a valid looking UUID
+            const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-5][0-9a-f]{3}-[089ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(patientId);
+            
+            if (!isUuid) {
+                console.log('[JournalService] Not a valid UUID, skipping cloud upload and database insert (Guest Mode).');
+                return null; 
+            }
+
+            // 2. Proceed with cloud upload for real users
             let audioUrl = null;
             if (audioUri) {
                 audioUrl = await JournalService.uploadAudio(patientId, audioUri);
             }
 
-            // Calculate Words Per Minute (WPM)
-            const wordCount = transcript.trim().split(/\s+/).length;
-            const minutes = Math.max(durationSeconds / 60, 0.1); // Avoid div zero
-            const wpm = Math.round(wordCount / minutes);
+            // Calculate WPM dynamically
+            const words = transcript.trim().split(/\s+/).filter(Boolean).length;
+            const calculatedWpm = durationSeconds > 0 ? Math.round((words / durationSeconds) * 60) : 0;
 
             const { data, error } = await supabase
                 .from('voice_journals')
@@ -101,7 +109,7 @@ export const JournalService = {
                         patient_id: patientId,
                         audio_url: audioUrl,
                         transcript: transcript,
-                        wpm: wpm,
+                        wpm: calculatedWpm,
                         clarity_score: clarityScore,
                     }
                 ])

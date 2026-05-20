@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "948439072238",
+    "project_id": "voiceaid-health",
+    "storage_bucket": "voiceaid-health.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:948439072238:android:a94725cf11bb9ce32aa2ff",
+        "android_client_info": {
+          "package_name": "com.dennis_9.VoiceAid_Health"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAf772JsZyhsg-5nCil4QstqKhom3klD_s"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
