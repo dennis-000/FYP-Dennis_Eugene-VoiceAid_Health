@@ -35,37 +35,44 @@ export const JournalService = {
     },
 
     /**
-     * Upload an audio file to Supabase storage.
+     * Upload an audio file to Supabase storage using the JS SDK.
+     * Uses the SDK's storage client which correctly attaches auth/anon tokens
+     * and handles RLS policies properly without needing manual URL construction.
      */
     uploadAudio: async (patientId: string, localUri: string): Promise<string | null> => {
         try {
-            const fileName = `journal_${patientId}_${Date.now()}.wav`; // Assuming WAV format
+            const fileName = `journal_${patientId}_${Date.now()}.wav`;
             const filePath = `${patientId}/${fileName}`;
 
-            // We must use expo-file-system uploadAsync for binary files in React Native
-            const { data: { session } } = await supabase.auth.getSession();
-            const token = session?.access_token || process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
-            
-            const uploadUrl = `${process.env.EXPO_PUBLIC_SUPABASE_URL}/storage/v1/object/journals/${filePath}`;
-
-            const uploadResult = await FileSystem.uploadAsync(uploadUrl, localUri, {
-                httpMethod: 'POST',
-                uploadType: 1 as any, // FileSystemUploadType.BINARY_CONTENT is 1
-                headers: {
-                    Authorization: `Bearer ${token}`,
-                    'Content-Type': 'audio/wav',
-                    'x-upsert': 'true',
-                },
+            // Read the file as base64, then convert to Uint8Array for SDK upload
+            const base64 = await FileSystem.readAsStringAsync(localUri, {
+                encoding: FileSystem.EncodingType.Base64,
             });
 
-            if (uploadResult.status !== 200) {
-                console.error('[JournalService] Storage upload failed:', uploadResult.body);
+            // Convert base64 → binary Uint8Array
+            const binaryStr = atob(base64);
+            const bytes = new Uint8Array(binaryStr.length);
+            for (let i = 0; i < binaryStr.length; i++) {
+                bytes[i] = binaryStr.charCodeAt(i);
+            }
+
+            // Upload via Supabase SDK — automatically attaches correct auth/anon headers
+            const { error } = await supabase.storage
+                .from('journals')
+                .upload(filePath, bytes, {
+                    contentType: 'audio/wav',
+                    upsert: true,
+                });
+
+            if (error) {
+                console.error('[JournalService] Storage upload failed:', error.message);
                 return null;
             }
 
             // Get the public URL
-            const { data } = supabase.storage.from('journals').getPublicUrl(filePath);
-            return data.publicUrl;
+            const { data: urlData } = supabase.storage.from('journals').getPublicUrl(filePath);
+            console.log('[JournalService] Upload success:', urlData.publicUrl);
+            return urlData.publicUrl;
 
         } catch (error) {
             console.error('[JournalService] Error uploading audio:', error);
