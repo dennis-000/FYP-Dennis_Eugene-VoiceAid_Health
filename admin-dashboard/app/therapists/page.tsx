@@ -23,12 +23,24 @@ export default function TherapistsPage() {
 
     const loadTherapists = useCallback(async () => {
         try {
+            // Fetch therapists and their patient counts dynamically
             const { data, error } = await supabase
                 .from('therapist_profiles')
-                .select('*')
+                .select(`
+                    *,
+                    patient_profiles:patient_profiles(count)
+                `)
                 .order('created_at', { ascending: false });
+
             if (error) throw error;
-            setTherapists(data || []);
+            
+            // Map the count to the therapist object
+            const therapistsWithCounts = data?.map(t => ({
+                ...t,
+                patientCount: t.patient_profiles?.[0]?.count || 0
+            })) || [];
+
+            setTherapists(therapistsWithCounts as any);
         } catch (error) {
             console.error('Error loading therapists:', error);
         } finally {
@@ -154,11 +166,11 @@ export default function TherapistsPage() {
                                     </td>
                                     <td className="px-6 py-4">
                                         <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-semibold ${
-                                            (t.assigned_patients?.length || 0) > 0
+                                            ((t as any).patientCount || 0) > 0
                                                 ? 'bg-blue-50 text-blue-700'
                                                 : 'bg-gray-50 text-gray-500'
-                                        }`}>
-                                            {t.assigned_patients?.length || 0}
+                                         }`}>
+                                            {(t as any).patientCount || 0}
                                         </span>
                                     </td>
                                     <td className="px-6 py-4 text-sm text-gray-500">

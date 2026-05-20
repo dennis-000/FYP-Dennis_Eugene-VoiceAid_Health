@@ -14,6 +14,7 @@ export default function PatientsPage() {
     useEffect(() => {
         checkAuth();
         loadPatients();
+        loadActiveAlerts();
     }, []);
 
     const checkAuth = async () => {
@@ -36,12 +37,85 @@ export default function PatientsPage() {
         }
     }, []);
 
+    const [activeAlerts, setActiveAlerts] = useState<Set<string>>(new Set());
+
+    // On mount: load any unresolved alerts from the last 24 hours
+    const loadActiveAlerts = async () => {
+        try {
+            const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+            const { data } = await supabase
+                .from('patient_analytics')
+                .select('patient_profile_id, mode, created_at')
+                .in('mode', ['CLINICAL_PRIORITY', 'CLINICAL_RESOLVED'])
+                .gte('created_at', since)
+                .order('created_at', { ascending: true });
+
+            if (!data) return;
+
+            // Replay events in order to find currently active alerts
+            const alertState = new Set<string>();
+            for (const row of data) {
+                const pid = row.patient_profile_id;
+                if (row.mode === 'CLINICAL_PRIORITY') alertState.add(pid);
+                if (row.mode === 'CLINICAL_RESOLVED') alertState.delete(pid);
+            }
+            if (alertState.size > 0) {
+                console.log('[Alerts] Restored active alerts on mount:', [...alertState]);
+                setActiveAlerts(alertState);
+            }
+        } catch (e) {
+            console.error('[Alerts] Failed to load active alerts:', e);
+        }
+    };
+
     // Real-time
     useEffect(() => {
-        const channel = supabase.channel('patients-realtime')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'patient_profiles' }, () => loadPatients())
-            .subscribe();
-        return () => { supabase.removeChannel(channel); };
+        const patientsChannel = supabase.channel('patients-realtime')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'patient_profiles' }, () => {
+                console.log('[Real-time] Patient profile changed, reloading...');
+                loadPatients();
+            })
+            .subscribe((status) => {
+                console.log('[Real-time] Patient channel status:', status);
+            });
+
+        const analyticsChannel = supabase.channel('analytics-alerts')
+            .on('postgres_changes', { 
+                event: 'INSERT', 
+                schema: 'public', 
+                table: 'patient_analytics'
+            }, (payload) => {
+                if (payload.errors) {
+                    console.error('[Real-time Alert] Payload Error:', payload.errors);
+                    return;
+                }
+                console.log('[Real-time Alert] RECEIVED:', payload);
+                const patientId = payload.new.patient_profile_id || payload.new.user_id;
+                const mode = payload.new.mode;
+                console.log(`[Real-time Alert] ${mode} for:`, patientId);
+                
+                if (mode === 'CLINICAL_RESOLVED') {
+                    setActiveAlerts(prev => {
+                        const next = new Set(prev);
+                        next.delete(patientId);
+                        return next;
+                    });
+                } else if (mode === 'CLINICAL_PRIORITY') {
+                    setActiveAlerts(prev => {
+                        const next = new Set(prev);
+                        next.add(patientId);
+                        return next;
+                    });
+                }
+            })
+            .subscribe((status) => {
+                console.log('[Real-time Alert] Analytics channel status:', status);
+            });
+
+        return () => {
+            supabase.removeChannel(patientsChannel);
+            supabase.removeChannel(analyticsChannel);
+        };
     }, [loadPatients]);
 
     const filtered = patients.filter(p =>
@@ -130,19 +204,27 @@ export default function PatientsPage() {
                             {filtered.map(p => (
                                 <tr key={p.id} className="hover:bg-[#CC0000]/5 transition-colors">
                                     <td className="px-6 py-4">
-                                        <div className="flex items-center gap-3">
-                                            <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-white text-sm font-bold shadow-sm ${
-                                                p.patient_type === 'hospital'
-                                                    ? 'bg-gradient-to-br from-[#008000] to-[#006600]'
-                                                    : 'bg-gradient-to-br from-[#FFD700] to-[#E6B800] text-black'
-                                            }`}>
-                                                {(p.full_name || 'G').charAt(0).toUpperCase()}
+                                            <div className="relative">
+                                                <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-white text-sm font-bold shadow-sm ${
+                                                    p.patient_type === 'hospital'
+                                                        ? 'bg-gradient-to-br from-[#008000] to-[#006600]'
+                                                        : 'bg-gradient-to-br from-[#FFD700] to-[#E6B800] text-black'
+                                                }`}>
+                                                    {(p.full_name || 'G').charAt(0).toUpperCase()}
+                                                </div>
+                                                {activeAlerts.has(p.id) && (
+                                                    <div className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full border-2 border-white animate-pulse" />
+                                                )}
                                             </div>
                                             <div>
-                                                <p className="text-sm font-medium text-gray-900">{p.full_name || 'Guest User'}</p>
+                                                <div className="flex items-center gap-2">
+                                                    <p className="text-sm font-medium text-gray-900">{p.full_name || 'Guest User'}</p>
+                                                    {activeAlerts.has(p.id) && (
+                                                        <span className="bg-red-500 text-white text-[8px] font-black px-1 rounded animate-pulse">CLINICAL ALERT</span>
+                                                    )}
+                                                </div>
                                                 <p className="text-[10px] text-gray-400 font-mono">{p.id.substring(0, 8)}...</p>
                                             </div>
-                                        </div>
                                     </td>
                                     <td className="px-6 py-4">
                                         <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold ${

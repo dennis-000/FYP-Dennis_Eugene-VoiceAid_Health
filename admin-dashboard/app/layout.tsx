@@ -104,8 +104,10 @@ export default function RootLayout({
     return (
         <html lang="en">
             <head>
-                <title>VoiceAid Admin Dashboard</title>
-                <meta name="description" content="Admin dashboard for managing VoiceAid Health organizations and users" />
+                <title>VoiceAid Health — Admin Dashboard</title>
+                <meta name="description" content="Clinical management dashboard for VoiceAid Health — monitor patients, manage therapists, and respond to emergency alerts in real time." />
+                <link rel="icon" href="/favicon.ico" type="image/x-icon" />
+                <meta name="theme-color" content="#1e40af" />
             </head>
             <body className={inter.className}>
                 <Sidebar />
