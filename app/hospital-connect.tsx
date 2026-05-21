@@ -25,7 +25,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRole } from '../contexts/RoleContext';
-import { createPatientProfile } from '../services/profileService';
+import { createPatientProfile, assignPatientToTherapist } from '../services/profileService';
 import { supabase } from '../lib/supabase';
 import { AppContext } from './_layout';
 import { useT } from '../utils/i18n';

@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Activity, BookOpen, Calendar, ChevronRight, ClipboardList, Dumbbell, Grid, HeartPulse, LogOut, Mic, Phone, Settings, Wand2 } from 'lucide-react-native';
 import React, { useContext, useEffect, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View, GestureResponderEvent } from 'react-native';
 import { AppContext } from '../../app/_layout';
 import { useRole } from '../../contexts/RoleContext';
 import { supabase } from '../../lib/supabase';
@@ -435,22 +435,20 @@ export const PatientDashboard: React.FC<PatientDashboardProps> = ({
 
             {/* Visual Scanning Full-Screen Interceptor */}
             {isScanningMode && (
-                <TouchableOpacity
+                <View
                     style={[StyleSheet.absoluteFill, { zIndex: 9999, backgroundColor: 'rgba(0,0,0,0)' }]}
-                    activeOpacity={1}
-                    onTouchStart={(e) => {
+                    onTouchStart={(e: GestureResponderEvent) => {
                         // If 2 or more fingers touch the screen, toggle pause/play
                         if (e.nativeEvent.touches.length >= 2) {
                             setIsScanningPaused(prev => !prev);
-                        }
-                    }}
-                    onPress={() => {
-                        // Only trigger if not paused
-                        if (isScanningPaused) return;
+                        } else {
+                            // Only trigger if not paused
+                            if (isScanningPaused) return;
 
-                        const target = scannerItems[scanningIndex];
-                        if (target) {
-                            router.push(target.route as any);
+                            const target = scannerItems[scanningIndex];
+                            if (target) {
+                                router.push(target.route as any);
+                            }
                         }
                     }}
                 />

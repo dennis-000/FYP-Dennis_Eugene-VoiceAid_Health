@@ -7,6 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AppContext } from './_layout';
 import { useT } from '../utils/i18n';
+import { haptics } from '../utils/haptics';
 import { ASRService } from '../services/asr';
 import { AudioPreprocessingService, ENHANCED_RECORDING_OPTIONS } from '../services/audioPreprocessingService';
 import { JournalService, VoiceJournal } from '../services/journalService';

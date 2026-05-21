@@ -170,7 +170,7 @@ export default function TranscriptionScreen() {
           const { data } = await supabase
               .from('patient_profiles')
               .select('user_id, full_name')
-              .in('user_id', therapistProfile.assigned_patients || []);
+              .in('user_id', therapistProfile?.assigned_patients || []);
           if (data) {
               setAssignedPatients(data.map(p => ({ id: p.user_id, name: p.full_name || 'Unnamed' })));
               if (data.length > 0) setSelectedPatientId(data[0].user_id);
@@ -586,7 +586,6 @@ export default function TranscriptionScreen() {
             predictedText={message.predictedText}
             type={message.type}
             timestamp={message.timestamp}
-            colors={colors}
             onPlay={() => TTSService.speak(message.predictedText || message.text, language as SupportedTTSLanguage)}
           />
         ))}

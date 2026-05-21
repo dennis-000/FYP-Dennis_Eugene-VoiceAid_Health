@@ -6,7 +6,10 @@ import {
     Trash2, 
     User, 
     Users,
-    Volume2
+    Volume2,
+    Languages,
+    Calendar,
+    Filter
 } from 'lucide-react-native';
 import React, { useContext, useEffect, useState, useMemo } from 'react';
 import {

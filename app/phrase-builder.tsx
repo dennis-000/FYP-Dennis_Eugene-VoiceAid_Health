@@ -15,6 +15,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { TTSService } from '../services/tts';
 import { AppContext } from './_layout';
+import { useT } from '../utils/i18n';
 
 const STORAGE_KEY = '@voiceaid_guest_phrases';
 
@@ -31,6 +32,7 @@ const COLOR_OPTIONS = ['#3b82f6','#10b981','#f59e0b','#ef4444','#8b5cf6','#ec489
 export default function PhraseBuilderScreen() {
     const router = useRouter();
     const { colors, language } = useContext(AppContext);
+    const tr = useT(language as any);
 
     const [phrases, setPhrases] = useState<GuestPhrase[]>([]);
     const [showModal, setShowModal] = useState(false);

@@ -30,7 +30,7 @@ interface TaskItemProps {
  */
 const TaskItem = ({ task, onToggle }: TaskItemProps) => {
   const { colors, themeMode } = useContext(AppContext);
-  const isContrast = themeMode === 'high-contrast';
+  const isContrast = (themeMode as string) === 'high-contrast';
 
   return (
     <TouchableOpacity 

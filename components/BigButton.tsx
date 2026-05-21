@@ -27,7 +27,7 @@ interface BigButtonProps {
  */
 const BigButton = ({ onPress, icon: Icon, label, color, fullWidth = false }: BigButtonProps) => {
   const { colors, themeMode } = useContext(AppContext);
-  const isContrast = themeMode === 'high-contrast';
+  const isContrast = (themeMode as string) === 'high-contrast';
 
   return (
     <TouchableOpacity 

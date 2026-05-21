@@ -416,6 +416,15 @@ const translations = {
     defaultFluencySubtitle: { en: 'Currently set to: 120 WPM', twi: 'Ahyehyɛe: 120 WPM', ga: 'Hye hye we: 120 WPM' },
     preparedDownload:   { en: 'Preparing CSV download...', twi: 'Ɔreboaboa CSV ano...', ga: 'Mitoo CSV download...' },
     targetConfigSub:    { en: 'Change default WPM target for new patients.', twi: 'Sesa WPM bɔta mma ayarefoɔ foforɔ.', ga: 'Sesa WPM bɔta ha helatsɛmɛi hei.' },
+    targetConfig:       { en: 'Target Configuration', twi: 'Nhyehyɛe Bɔta', ga: 'Nhyehyɛe Bɔta' },
+    globalAuditLogs:    { en: 'Global Audit Logs', twi: 'Abakɔsɛm Nkyerɛkyerɛmu', ga: 'Nkyenekyene Fɛɛ' },
+    globalAuditSubtitle: { en: 'Review system-wide activity', twi: 'Hwɛ nhyehyɛe dwumadie nyinaa', ga: 'Kwɛ nifeemɔ fɛɛ' },
+    dataCompliance:     { en: 'Data Compliance', twi: 'Nsɛm Mmara', ga: 'Nsɛm Mmara' },
+    exportPatientData:  { en: 'Export Patient Data', twi: 'Kɔ nsɛm gu foforɔ', ga: 'Export Patient Data' },
+    exportDataSubtitle: { en: 'Download copy of all client profiles', twi: 'Twa ayarefoɔ nyinaa ho mfonini', ga: 'Download copy of all client profiles' },
+    roleLabel:          { en: 'Role', twi: 'Dwumadie', ga: 'Nifeemɔ' },
+    patientRole:        { en: 'Patient', twi: 'Ɔyarefoɔ', ga: 'Helatsɛ' },
+    therapistRole:      { en: 'Therapist', twi: 'Dɔkota', ga: 'Doctɔr' },
 
     logoutConfirmMessage: { en: 'Are you sure you want to logout? You will return to the welcome screen.', twi: 'Wo gye di sɛ wufi mu? Mobasane akɔ mfitiaseɛ hɔ.', ga: 'Onyɛ ojwɛ akɛ obotue? Obaasane aya welcome page.' },
 
