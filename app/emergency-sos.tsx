@@ -30,6 +30,8 @@ interface MedicalInfo {
     notes: string;
 }
 
+import KenteAccent from '../components/KenteAccent';
+
 export default function ClinicalPriorityScreen() {
     const router = useRouter();
     const { colors, language } = useContext(AppContext);
@@ -184,14 +186,19 @@ export default function ClinicalPriorityScreen() {
     return (
         <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]}>
             {/* Header */}
-            <View style={[styles.header, { borderBottomColor: colors.border }]}>
-                <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-                    <ArrowLeft size={24} color={colors.text} />
-                </TouchableOpacity>
-                <Text style={[styles.headerTitle, { color: colors.text }]}>{tr('emergencySOSTitle')}</Text>
-                <TouchableOpacity onPress={() => setShowMedicalModal(true)}>
-                    <Heart size={24} color="#ef4444" />
-                </TouchableOpacity>
+            <View style={{ backgroundColor: colors.bg }}>
+                <View style={[styles.header, { borderBottomColor: 'transparent', paddingHorizontal: 20, paddingVertical: 12, alignItems: 'center' }]}>
+                    <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+                        <ArrowLeft size={24} color={colors.text} />
+                    </TouchableOpacity>
+                    <Text style={[styles.headerTitle, { color: colors.text }]}>{tr('emergencySOSTitle')}</Text>
+                    <TouchableOpacity onPress={() => setShowMedicalModal(true)}>
+                        <Heart size={24} color="#ef4444" />
+                    </TouchableOpacity>
+                </View>
+                <View style={{ paddingHorizontal: 20, marginTop: -6, marginBottom: 6 }}>
+                    <KenteAccent />
+                </View>
             </View>
 
             <ScrollView contentContainerStyle={styles.scroll}>

@@ -30,6 +30,7 @@ import { supabase } from '../lib/supabase';
 import { AppContext } from './_layout';
 import { useT } from '../utils/i18n';
 import { TTSService } from '../services/tts';
+import KenteAccent from '../components/KenteAccent';
 
 type Mode = 'new' | 'returning';
 
@@ -99,25 +100,34 @@ export default function HospitalConnectScreen() {
                 .single();
 
             if (error || !therapist) {
-                Alert.alert('Invalid Code', 'That invite code is not valid. Please check with your therapist.');
+                Alert.alert('Invalid Code', 'No therapist found with that invite code.');
+                setLoading(false);
                 return;
             }
 
-            // 2. Create a brand new patient profile (always — no name guessing)
-            const patient = await createPatientProfile(
+            // 2. Create the patient profile
+            const newPatient = await createPatientProfile(
                 'hospital',
                 undefined,
                 fullName.trim(),
                 therapist.id,
                 therapist.organization_id,
             );
+            if (!newPatient) {
+                Alert.alert('Error', 'Failed to create patient profile.');
+                setLoading(false);
+                return;
+            }
 
-            if (!patient) throw new Error('Could not create patient profile.');
+            // 3. Link them to the therapist
+            const linked = await assignPatientToTherapist(therapist.id, newPatient.id);
+            if (!linked) {
+                Alert.alert('Error', 'Failed to link patient to therapist.');
+                setLoading(false);
+                return;
+            }
 
-            // 3. Link patient to therapist's assigned list (CRITICAL for dashboard visibility)
-            await assignPatientToTherapist(therapist.id, patient.id);
-
-            await bindPatient(patient, true);
+            await bindPatient(newPatient, true);
         } catch (e: any) {
             Alert.alert('Error', e.message || 'Something went wrong.');
         } finally {
@@ -186,6 +196,7 @@ export default function HospitalConnectScreen() {
                         <Text style={[s.subtitle, { color: colors.subText }]}>
                             {tr('newOrReturning')}
                         </Text>
+                        <KenteAccent />
                     </View>
 
                     {/* Mode Tabs */}

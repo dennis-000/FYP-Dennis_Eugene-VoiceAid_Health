@@ -28,6 +28,20 @@ import { useT } from '../utils/i18n';
 
 const { width } = Dimensions.get('window');
 
+// Reusable elegant African Kente design accent bar
+const KenteAccent = () => (
+    <View style={{ flexDirection: 'row', height: 6, width: '100%', overflow: 'hidden', borderRadius: 3, marginVertical: 14 }}>
+        {Array.from({ length: 6 }).map((_, i) => (
+            <React.Fragment key={i}>
+                <View style={{ flex: 1, backgroundColor: '#dc2626' }} />
+                <View style={{ flex: 1, backgroundColor: '#eab308' }} />
+                <View style={{ flex: 1, backgroundColor: '#22c55e' }} />
+                <View style={{ flex: 1, backgroundColor: '#111111' }} />
+            </React.Fragment>
+        ))}
+    </View>
+);
+
 export default function WelcomeScreen() {
     const router = useRouter();
     const { colors, language, ttsVoice, ttsSpeed } = useContext(AppContext);
@@ -81,6 +95,7 @@ export default function WelcomeScreen() {
                     <Text style={[styles.subtitle, { color: colors.subText }]}>
                         {tr('voiceAidSub')}
                     </Text>
+                    <KenteAccent />
                 </View>
 
                 {/* Role Selection Section */}

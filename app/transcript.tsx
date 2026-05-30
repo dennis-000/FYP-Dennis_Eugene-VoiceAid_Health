@@ -1,4 +1,4 @@
-import { Audio } from 'expo-av';
+import { useAudioRecorder, useAudioRecorderState, RecordingPresets, AudioModule } from 'expo-audio';
 import { useRouter } from 'expo-router';
 import { ArrowLeft, Mic, Share2, Square, Volume2 } from 'lucide-react-native';
 import React, { useCallback, useContext, useEffect, useRef, useState } from 'react';
@@ -30,21 +30,28 @@ import { SupportedTTSLanguage } from '../services/tts/config';
 import { haptics } from '../utils/haptics';
 import { AppContext } from './_layout';
 import { supabase } from '../lib/supabase';
+import KenteAccent from '../components/KenteAccent';
+import { useNetworkStatus } from '../utils/network';
 
 const Header = ({ title, onBack, onShare, colors }: { title: string, onBack: () => void, onShare?: () => void, colors: any }) => {
   return (
-    <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border + '50' }]}>
-      <TouchableOpacity onPress={onBack} style={styles.backBtn}>
-        <ArrowLeft size={24} color={colors.text} />
-      </TouchableOpacity>
-      <Text style={[styles.headerTitle, { color: colors.text }]}>{title}</Text>
-      {onShare ? (
-        <TouchableOpacity onPress={onShare} style={styles.backBtn}>
-          <Share2 size={22} color={colors.primary} />
+    <View style={{ backgroundColor: colors.card }}>
+      <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: 'transparent', height: 60 }]}>
+        <TouchableOpacity onPress={onBack} style={styles.backBtn}>
+          <ArrowLeft size={24} color={colors.text} />
         </TouchableOpacity>
-      ) : (
-        <View style={{ width: 24 }} />
-      )}
+        <Text style={[styles.headerTitle, { color: colors.text }]}>{title}</Text>
+        {onShare ? (
+          <TouchableOpacity onPress={onShare} style={styles.backBtn}>
+            <Share2 size={22} color={colors.primary} />
+          </TouchableOpacity>
+        ) : (
+          <View style={{ width: 24 }} />
+        )}
+      </View>
+      <View style={{ paddingHorizontal: 16, marginTop: -4, marginBottom: 4 }}>
+        <KenteAccent />
+      </View>
     </View>
   );
 };
@@ -60,12 +67,28 @@ interface Message {
 export default function TranscriptionScreen() {
   const router = useRouter();
   const { colors, language, reduceMotion: hapticEnabled } = useContext(AppContext);
+  const isOnline = useNetworkStatus();
   const { role } = useRole();
   const t = getTranslationsSync(language as Language);
   const scrollViewRef = useRef<ScrollView>(null);
 
   // State
-  const [recording, setRecording] = useState<Audio.Recording | null>(null);
+  const audioRecorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
+  const recorderState = useAudioRecorderState(audioRecorder, 100);
+
+  const recording = audioRecorder.isRecording ? audioRecorder : null;
+  const chunkIntervalRef = useRef<any>(null);
+
+  // Metering levels sync
+  useEffect(() => {
+    if (audioRecorder.isRecording && typeof recorderState.metering === 'number') {
+      setMeteringLevels(prev => {
+        const newLevels = [...prev, recorderState.metering || -160];
+        return newLevels.slice(-20);
+      });
+    }
+  }, [recorderState.metering, audioRecorder.isRecording]);
+
   const [isProcessing, setIsProcessing] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [hasPlayedWelcome, setHasPlayedWelcome] = useState(false);
@@ -193,7 +216,7 @@ export default function TranscriptionScreen() {
   // Request microphone permissions on mount
   useEffect(() => {
     (async () => {
-      const { status } = await Audio.requestPermissionsAsync();
+      const { status } = await AudioModule.requestRecordingPermissionsAsync();
       if (status !== 'granted') Alert.alert('Permission needed', 'Microphone access is required.');
     })();
   }, []);
@@ -204,8 +227,11 @@ export default function TranscriptionScreen() {
       console.log('[TranscriptScreen] Unmounting - cleaning up recording');
       isStreamingRef.current = false;
       TTSService.stop().catch(() => {});
-      if (recordingRef.current) {
-        recordingRef.current.stopAndUnloadAsync().catch(() => { });
+      if (chunkIntervalRef.current) {
+        clearInterval(chunkIntervalRef.current);
+      }
+      if (audioRecorder.isRecording) {
+        audioRecorder.stop().catch(() => {});
       }
     };
   }, []); // Empty dependency array = runs only on mount/unmount
@@ -214,7 +240,7 @@ export default function TranscriptionScreen() {
   useEffect(() => {
     (async () => {
       try {
-        const { status } = await Audio.requestPermissionsAsync();
+        const { status } = await AudioModule.requestRecordingPermissionsAsync();
         console.log('[TranscriptScreen] Audio permission status:', status);
         if (status !== 'granted') {
           Alert.alert('Permission Required', 'Microphone access is needed for transcription.');
@@ -225,24 +251,18 @@ export default function TranscriptionScreen() {
     })();
   }, []);
 
-  const recordingRef = useRef<Audio.Recording | null>(null);
-
   const startRecording = async () => {
     console.log('[TranscriptScreen] startRecording called');
     try {
       setMeteringLevels([]);
 
       // ── GUARD: Stop any existing recording before creating a new one ──
-      // This prevents "Only one Recording object can be prepared at a given time."
-      if (recordingRef.current) {
+      if (audioRecorder.isRecording) {
         try {
-          await recordingRef.current.stopAndUnloadAsync();
+          await audioRecorder.stop();
         } catch (_) {
-          // Ignore — it may already be stopped
+          // Ignore
         }
-        recordingRef.current = null;
-        setRecording(null);
-        // Brief pause to let the audio system fully release the hardware
         await new Promise(resolve => setTimeout(resolve, 100));
       }
 
@@ -251,26 +271,18 @@ export default function TranscriptionScreen() {
       console.log('[TranscriptScreen] Audio session configured');
 
       if (!isStreamingRef.current && isStreaming) {
-          console.log('[TranscriptScreen] Stream stopped during config. Aborting recording lock to prevent memory leaks.');
+          console.log('[TranscriptScreen] Stream stopped during config. Aborting.');
           return null;
       }
 
-      const { recording } = await Audio.Recording.createAsync(
-        ENHANCED_RECORDING_OPTIONS,
-        (status) => {
-          if (status.metering) {
-            setMeteringLevels(prev => {
-              const newLevels = [...prev, status.metering || -160];
-              return newLevels.slice(-20); // Keep last 20 levels
-            });
-          }
-        }
-      );
+      await audioRecorder.prepareToRecordAsync({
+        ...RecordingPresets.HIGH_QUALITY,
+        isMeteringEnabled: true,
+      });
+      await audioRecorder.record();
 
       console.log('[TranscriptScreen] Recording started successfully');
-      setRecording(recording);
-      recordingRef.current = recording;
-      return recording; // Return for loop usage
+      return audioRecorder;
     } catch (err) {
       console.error('[Recording Error]', err);
       Alert.alert('Error', 'Could not start recording: ' + (err as any).message);
@@ -280,16 +292,12 @@ export default function TranscriptionScreen() {
 
 
   const stopAndTranscribe = async () => {
-    const currentRecording = recordingRef.current || recording;
-    if (!currentRecording) return;
+    if (!audioRecorder.isRecording) return;
 
     try {
       setIsProcessing(true);
-      await currentRecording.stopAndUnloadAsync();
-      const uri = currentRecording.getURI();
-
-      setRecording(null);
-      recordingRef.current = null;
+      await audioRecorder.stop();
+      const uri = audioRecorder.uri;
 
       if (!uri) {
         Alert.alert('Error', 'No audio recorded');
@@ -379,24 +387,23 @@ export default function TranscriptionScreen() {
       // Chunk loop (Record -> Stop -> Send -> Delay -> Record)
       const chunkInterval = setInterval(async () => {
         if (!isStreamingRef.current) {
-            clearInterval((recordingRef as any)._chunkInterval);
+            clearInterval(chunkIntervalRef.current);
             return;
         }
 
-        const currentRec = recordingRef.current;
-        if (currentRec) {
+        if (audioRecorder.isRecording) {
           try {
             // Check metering levels for VAD (Voice Activity Detection)
             // If levels are extremely low, it's silence or background noise
             const isSpeech = AudioPreprocessingService.isSpeechDetected(meteringLevels);
             
             // 1. Stop current
-            await currentRec.stopAndUnloadAsync();
-            const uri = currentRec.getURI();
+            await audioRecorder.stop();
+            const uri = audioRecorder.uri;
 
             // 2. Send chunk ONLY if speech was detected OR chunk id is 0 (to keep connection alive)
             if (uri && isStreamingRef.current) {
-              if (isSpeech || (recordingRef as any)._chunkCounter === 0) {
+              if (isSpeech || (audioRecorder as any)._chunkCounter === 0) {
                 console.log('[Live ASR] Sending chunk (Speech detected)...');
                 streamingASRService.sendAudioChunk(uri).catch(err =>
                   console.error('[Live ASR] Send error:', err)
@@ -420,7 +427,7 @@ export default function TranscriptionScreen() {
           } catch (error) {
             console.error('[Live ASR] Chunking error:', error);
             // Try to recover by restarting recording if it failed
-            if (!recordingRef.current && isStreamingRef.current) {
+            if (!audioRecorder.isRecording && isStreamingRef.current) {
               await new Promise(resolve => setTimeout(resolve, 500));
               await startRecording();
             }
@@ -429,7 +436,7 @@ export default function TranscriptionScreen() {
       }, 5000); // 5-second chunks — gives speech-impaired speakers time to complete words/phrases
 
       // Store interval for cleanup
-      (recordingRef as any)._chunkInterval = chunkInterval;
+      chunkIntervalRef.current = chunkInterval;
 
     } catch (error: any) {
       console.error('[Live ASR] Failed to start:', error);
@@ -448,21 +455,18 @@ export default function TranscriptionScreen() {
       isStreamingRef.current = false;
       
       // Clear interval
-      if ((recordingRef as any)._chunkInterval) {
-        clearInterval((recordingRef as any)._chunkInterval);
-        (recordingRef as any)._chunkInterval = null;
+      if (chunkIntervalRef.current) {
+        clearInterval(chunkIntervalRef.current);
+        chunkIntervalRef.current = null;
       }
 
       // Stop current recording
-      const currentRec = recordingRef.current;
-      if (currentRec) {
+      if (audioRecorder.isRecording) {
         try {
-          await currentRec.stopAndUnloadAsync();
+          await audioRecorder.stop();
         } catch (e) {
           // Ignore if already stopped
         }
-        setRecording(null);
-        recordingRef.current = null;
       }
 
       // Wait briefly for any in-flight transcription responses before disconnecting
@@ -533,6 +537,26 @@ export default function TranscriptionScreen() {
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]}>
       <Header title={t.transcript.title} onBack={() => router.back()} onShare={handleShareTranscript} colors={colors} />
+
+      {/* ASR Connection Status Pill */}
+      <View style={{ paddingHorizontal: 16, paddingTop: 10, paddingBottom: 6, flexDirection: 'row' }}>
+        <View style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 6,
+          backgroundColor: isOnline ? '#e6fdfa' : '#fef2f2',
+          borderColor: isOnline ? '#0d9488' : '#fca5a5',
+          borderWidth: 1,
+          borderRadius: 20,
+          paddingHorizontal: 12,
+          paddingVertical: 6,
+        }}>
+          <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: isOnline ? '#0d9488' : '#ef4444' }} />
+          <Text style={{ fontSize: 13, fontWeight: 'bold', color: isOnline ? '#0f766e' : '#b91c1c' }}>
+            {isOnline ? '🟢 Dysarthria Model Online' : '🟡 Offline ASR Mode'}
+          </Text>
+        </View>
+      </View>
 
       {/* Caregiver Patient Selector */}
       {role === 'caregiver' && assignedPatients.length > 0 && (

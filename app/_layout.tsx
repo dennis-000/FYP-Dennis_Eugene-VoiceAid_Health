@@ -1,12 +1,23 @@
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import React, { createContext, useCallback, useEffect, useState } from 'react';
-import { StatusBar, View } from 'react-native';
+import { StatusBar, View, Platform } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import AnimatedSplashScreen from '../components/AnimatedSplashScreen';
 import { THEMES, ThemeMode } from '../constants/theme';
 import { AuthProvider } from '../contexts/AuthContext';
 import { RoleProvider, UserRole } from '../contexts/RoleContext';
+
+// Web reconciliation patch to prevent 'removeChild' crash in React 19 / Expo Web development
+if (Platform.OS === 'web' && typeof window !== 'undefined') {
+  const originalRemoveChild = Node.prototype.removeChild;
+  Node.prototype.removeChild = function (child) {
+    if (child && child.parentNode !== this) {
+      return child;
+    }
+    return originalRemoveChild.call(this, child);
+  };
+}
 
 // Keep the native splash screen visible while we load resources
 SplashScreen.preventAutoHideAsync();
@@ -14,6 +25,7 @@ SplashScreen.preventAutoHideAsync();
 import { LogBox } from 'react-native';
 LogBox.ignoreLogs([
   'Expo AV has been deprecated',
+  '"shadow*" style props are deprecated',
 ]);
 
 // Context Definition
@@ -125,6 +137,8 @@ function AppNavigation() {
         <Stack.Screen name="patient-detail" />
         <Stack.Screen name="my-assignments" />
         <Stack.Screen name="patient-history" />
+        <Stack.Screen name="therapy-word-game" />
+        <Stack.Screen name="phrase-builder-quest" />
       </Stack>
 
       {showSplash && (

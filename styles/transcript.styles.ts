@@ -1,4 +1,5 @@
 import { StyleSheet } from 'react-native';
+import { createShadow } from '../utils/shadows';
 
 export const transcriptStyles = StyleSheet.create({
     container: { flex: 1 },
@@ -34,11 +35,7 @@ export const transcriptStyles = StyleSheet.create({
         marginBottom: 20,
         alignItems: 'center',
         justifyContent: 'center',
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-        elevation: 3
+        ...createShadow('#000', 0, 2, 0.1, 4, 3),
     },
     transcriptText: {
         fontSize: 22,
@@ -81,10 +78,7 @@ export const transcriptStyles = StyleSheet.create({
         borderRadius: 40,
         alignItems: 'center',
         justifyContent: 'center',
-        elevation: 5,
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 4.65,
+        ...createShadow('#000', 0, 4, 0.3, 4.65, 5),
     },
 
     // Text Input for editing

@@ -1,4 +1,5 @@
 import { StyleSheet } from 'react-native';
+import { createShadow } from '../utils/shadows';
 
 export const welcomeStyles = StyleSheet.create({
     container: {
@@ -23,11 +24,7 @@ export const welcomeStyles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
         marginBottom: 28,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.1,
-        shadowRadius: 24,
-        elevation: 4,
+        ...createShadow('#000', 0, 8, 0.1, 24, 4),
     },
     title: {
         fontSize: 36,
@@ -66,11 +63,7 @@ export const welcomeStyles = StyleSheet.create({
         borderWidth: 1,
         marginBottom: 16,
         minHeight: 110,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 12 },
-        shadowOpacity: 0.04,
-        shadowRadius: 16,
-        elevation: 2,
+        ...createShadow('#000', 0, 12, 0.04, 16, 2),
     },
     patientButton: {},
     caregiverButton: {},

@@ -10,7 +10,7 @@
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Audio } from 'expo-av';
+import { useAudioRecorder, useAudioRecorderState, RecordingPresets, AudioModule } from 'expo-audio';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import {
@@ -107,7 +107,11 @@ export default function MyAssignmentsScreen() {
     const [isRecording, setIsRecording] = useState(false);
     const [isProcessing, setIsProcessing] = useState(false);
     const [transcript, setTranscript] = useState<Record<string, string>>({});
-    const recordingRef = useRef<Audio.Recording | null>(null);
+    
+    // Recording hook
+    const audioRecorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
+    const recorderState = useAudioRecorderState(audioRecorder, 100);
+
     const hasAnnouncedRef = useRef(false);
 
     // Pulsing animation for mic button
@@ -116,6 +120,11 @@ export default function MyAssignmentsScreen() {
     useEffect(() => {
         loadData();
         requestMicPermission();
+        return () => {
+            if (audioRecorder.isRecording) {
+                audioRecorder.stop().catch(() => {});
+            }
+        };
     }, []);
 
     // Reload goals when selected date changes
@@ -138,7 +147,7 @@ export default function MyAssignmentsScreen() {
     }, [isRecording]);
 
     const requestMicPermission = async () => {
-        const { status } = await Audio.requestPermissionsAsync();
+        const { status } = await AudioModule.requestRecordingPermissionsAsync();
         if (status !== 'granted') {
             console.warn('[Assignments] Microphone permission denied');
         }
@@ -220,8 +229,11 @@ export default function MyAssignmentsScreen() {
             setSpeakingId(null);
             setActiveGoalId(goalId);
             await AudioPreprocessingService.configureAudioSession();
-            const { recording } = await Audio.Recording.createAsync(ENHANCED_RECORDING_OPTIONS);
-            recordingRef.current = recording;
+            await audioRecorder.prepareToRecordAsync({
+                ...RecordingPresets.HIGH_QUALITY,
+                isMeteringEnabled: false,
+            });
+            await audioRecorder.record();
             setIsRecording(true);
         } catch (err) {
             console.error('[Assignments ASR] Start error:', err);
@@ -229,16 +241,14 @@ export default function MyAssignmentsScreen() {
     };
 
     const stopAndTranscribe = async () => {
-        const currentRecording = recordingRef.current;
-        if (!currentRecording || !activeGoalId) return;
+        if (!audioRecorder.isRecording || !activeGoalId) return;
 
         setIsRecording(false);
         setIsProcessing(true);
 
         try {
-            await currentRecording.stopAndUnloadAsync();
-            const uri = currentRecording.getURI();
-            recordingRef.current = null;
+            await audioRecorder.stop();
+            const uri = audioRecorder.uri;
 
             if (!uri) throw new Error('No audio URI');
 
@@ -285,6 +295,20 @@ export default function MyAssignmentsScreen() {
         return acc;
     }, {} as Record<GoalCategory, PatientGoal[]>);
 
+    // Reusable elegant African Kente design accent bar
+    const KenteAccent = () => (
+        <View style={{ flexDirection: 'row', height: 6, width: '100%', overflow: 'hidden', borderRadius: 3, marginBottom: 12 }}>
+            {Array.from({ length: 8 }).map((_, i) => (
+                <React.Fragment key={i}>
+                    <View style={{ flex: 1, backgroundColor: '#dc2626' }} />
+                    <View style={{ flex: 1, backgroundColor: '#eab308' }} />
+                    <View style={{ flex: 1, backgroundColor: '#22c55e' }} />
+                    <View style={{ flex: 1, backgroundColor: '#111111' }} />
+                </React.Fragment>
+            ))}
+        </View>
+    );
+
     return (
         <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]}>
             {/* Header */}
@@ -293,8 +317,12 @@ export default function MyAssignmentsScreen() {
                     <ArrowLeft size={24} color={colors.text} />
                 </TouchableOpacity>
                 <View style={{ flex: 1, marginLeft: 12 }}>
-                    <Text style={[styles.headerTitle, { color: colors.text }]}>{tr('myAssignments')}</Text>
-                    <Text style={[styles.headerSub, { color: colors.subText }]}>{tr('fromYourTherapist')}</Text>
+                    <Text style={[styles.headerTitle, { color: colors.text }]}>
+                        {language === 'twi' ? 'Me Nnwuma (Missions)' : language === 'ga' ? 'Missions' : 'My Active Missions'}
+                    </Text>
+                    <Text style={[styles.headerSub, { color: colors.subText }]}>
+                        {language === 'twi' ? 'Adesua a wo dɔkota de ama wo' : language === 'ga' ? 'Kasemɔ kɛjɛ odɔkɔta ŋɔɔ' : 'Assigned by your speech therapist'}
+                    </Text>
                 </View>
             </View>
 
@@ -339,7 +367,7 @@ export default function MyAssignmentsScreen() {
             {!isToday && (
                 <View style={{ backgroundColor: '#fef9c3', paddingVertical: 8, paddingHorizontal: 16 }}>
                     <Text style={{ color: '#92400e', fontSize: 13, textAlign: 'center' }}>
-                        📖 {tr('viewingPastAssigments')}
+                        📖 {language === 'twi' ? 'Worehwɛ Missions a atwam' : language === 'ga' ? 'Okwɛɔ Missions pɛŋ' : 'Viewing completed past missions'}
                     </Text>
                 </View>
             )}
@@ -368,14 +396,19 @@ export default function MyAssignmentsScreen() {
             )}
 
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 16 }}>
+                {/* Horizontal Kente Bar */}
+                <KenteAccent />
+
                 {loading ? (
                     <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 60 }} />
                 ) : totalCount === 0 ? (
                     <View style={styles.emptyContainer}>
                         <Text style={{ fontSize: 60 }}>📋</Text>
-                        <Text style={[styles.emptyTitle, { color: colors.text }]}>{tr('noAssignmentsYet')}</Text>
+                        <Text style={[styles.emptyTitle, { color: colors.text }]}>
+                            {language === 'twi' ? 'Nnwuma (Missions) biara nni ha' : language === 'ga' ? 'Missions koom yɛɔ' : 'No Active Missions Today'}
+                        </Text>
                         <Text style={[styles.emptySubtitle, { color: colors.subText }]}>
-                            {tr('noAssignmentsSub')}
+                            {language === 'twi' ? 'Wo dɔkota mmae wo nnwuma biara ndɛ.' : language === 'ga' ? 'Odɔkɔta kɛ weɔ kasemɔ koom ha bo daa gbi.' : 'Your therapist has not assigned any speech missions for this day.'}
                         </Text>
                     </View>
                 ) : (
@@ -387,7 +420,7 @@ export default function MyAssignmentsScreen() {
                                     {tr('keepItUp')}{patientName ? `, ${patientName.split(' ')[0]}` : ''}! 💪
                                 </Text>
                                 <Text style={styles.progressText}>
-                                    {completedCount} {tr('of')} {totalCount} {tr('assignmentsDone')}
+                                    {completedCount} of {totalCount} Missions Completed
                                 </Text>
                                 <View style={styles.progressBarBg}>
                                     <View style={[styles.progressBarFill, { width: `${percent}%` }]} />
@@ -401,7 +434,7 @@ export default function MyAssignmentsScreen() {
                         {/* Instruction hint */}
                         <View style={[styles.hintBox, { backgroundColor: colors.card, borderColor: colors.border }]}>
                             <Text style={{ fontSize: 13, color: colors.subText, textAlign: 'center', lineHeight: 18 }}>
-                                🔊 {tr('tapSpeakerToHear')}{'   '}•{'   '}🎤 {tr('tapMicToSpeak')}
+                                🔊 Hear Mission Instructions{'   '}•{'   '}🎤 Speak to Answer
                             </Text>
                         </View>
 
@@ -558,10 +591,10 @@ export default function MyAssignmentsScreen() {
                             <View style={[styles.celebCard, { borderColor: '#22c55e' }]}>
                                 <Text style={{ fontSize: 40 }}>🎉</Text>
                                 <Text style={{ color: '#22c55e', fontWeight: 'bold', fontSize: 16, marginTop: 8 }}>
-                                    {tr('allDoneToday')}
+                                    {language === 'twi' ? 'Nnwuma (Missions) nyinaa awie! 🎉' : language === 'ga' ? 'Missions fɛɛ egbe naa! 🎉' : 'All Missions Completed! 🎉'}
                                 </Text>
                                 <Text style={{ color: colors.subText, fontSize: 13, marginTop: 4, textAlign: 'center' }}>
-                                    {tr('amazingWorkProgress')}
+                                    {language === 'twi' ? 'Abɔ mmɔden pa ara ndɛ adesua no mu.' : language === 'ga' ? 'Ofee he yie waa kɛha gbii nɛ.' : 'Excellent work finishing your speech exercises for today. Keep it up!'}
                                 </Text>
                             </View>
                         )}

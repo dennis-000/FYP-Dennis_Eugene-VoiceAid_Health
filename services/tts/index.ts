@@ -1,8 +1,10 @@
-import { Audio } from 'expo-av';
+import { createAudioPlayer, setAudioModeAsync, AudioPlayer } from 'expo-audio';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Speech from 'expo-speech';
 import { ENDPOINTS } from '../../constants/config';
 import { DEFAULT_OPTIONS, SupportedTTSLanguage } from './config';
+
+import { checkOnlineStatus } from '../../utils/network';
 
 /**
  * ==========================================
@@ -12,8 +14,8 @@ import { DEFAULT_OPTIONS, SupportedTTSLanguage } from './config';
  * - Twi/Ga:  Attempts Ghana NLP API; falls back to 'en-GH' (Ghanaian English) if API fails.
  */
 
-// Keep track of the current sound object to stop it if needed
-let currentSound: Audio.Sound | null = null;
+// Keep track of the current sound player to stop it if needed
+let currentSound: AudioPlayer | null = null;
 
 export const TTSService = {
 
@@ -44,6 +46,12 @@ export const TTSService = {
             // 3. STRATEGY B: Pro-Grade API TTS for Twi / Ga
             // (Using the high-quality YarnGPT2 / StyleTTS2 architecture)
             try {
+                const isOnline = await checkOnlineStatus();
+                if (!isOnline) {
+                    console.log('[TTS] Offline - Bypassing API, falling back to Native en-GH instantly');
+                    Speech.speak(text, { ...DEFAULT_OPTIONS, rate, language: 'en-GH', onDone: () => resolve(), onError: () => resolve() });
+                    return;
+                }
                 console.log(`[TTS] Fetching High-Quality Human audio for ${language}: ${text}`);
 
                 // The new StyleTTS2-based models don't suffer from tail-clipping, but we still 
@@ -87,29 +95,33 @@ export const TTSService = {
                         console.log(`[TTS] Saved audio to ${uri}, playing...`);
 
                         // Force audio to play loudly through the main device speaker, NOT the invisible earpiece
-                        await Audio.setAudioModeAsync({
-                            playsInSilentModeIOS: true,
-                            staysActiveInBackground: false,
-                            playThroughEarpieceAndroid: false,
-                            allowsRecordingIOS: false,
+                        await setAudioModeAsync({
+                            playsInSilentMode: true,
+                            shouldPlayInBackground: false,
                         });
 
                         // Play the WAV file
-                        const { sound } = await Audio.Sound.createAsync(
-                            { uri },
-                            { shouldPlay: true, rate, shouldCorrectPitch: true }
-                        );
-                        currentSound = sound;
+                        const player = createAudioPlayer(uri);
+                        player.shouldCorrectPitch = true;
+                        player.playbackRate = rate;
+                        currentSound = player;
 
                         // Log when playback completes
-                        sound.setOnPlaybackStatusUpdate((status) => {
+                        const subscription = player.addListener('playbackStatusUpdate', (status) => {
                             if (status.isLoaded && status.didJustFinish) {
                                 console.log('[TTS] Playback completed');
+                                subscription.remove();
+                                player.release();
+                                if (currentSound === player) {
+                                    currentSound = null;
+                                }
                                 // Allow 500ms for the audio tail to physically decay through the speaker
                                 // This prevents rate-stretched buffers from being preemptively cut by the next queued sound!
                                 setTimeout(resolve, 500);
                             }
                         });
+
+                        player.play();
                     } catch (innerError) {
                         console.error("[TTS Playback Error - Falling back to Native]", innerError);
                         Speech.speak(text, { ...DEFAULT_OPTIONS, rate, language: 'en-GH', onDone: () => resolve(), onError: () => resolve() });
@@ -135,8 +147,8 @@ export const TTSService = {
         // Stop API Audio
         if (currentSound) {
             try {
-                await currentSound.stopAsync();
-                await currentSound.unloadAsync();
+                currentSound.pause();
+                currentSound.release();
             } catch (e) {
                 // Ignore errors if sound is already unloaded
             }

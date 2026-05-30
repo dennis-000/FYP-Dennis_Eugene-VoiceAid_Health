@@ -1,4 +1,4 @@
-import { Audio } from 'expo-av';
+import { useAudioRecorder, useAudioRecorderState, RecordingPresets, AudioModule } from 'expo-audio';
 import { useRouter } from 'expo-router';
 import { ArrowLeft, BookOpen, Clock, Mic, Square, Volume2 } from 'lucide-react-native';
 import React, { useContext, useEffect, useRef, useState } from 'react';
@@ -13,6 +13,22 @@ import { AudioPreprocessingService, ENHANCED_RECORDING_OPTIONS } from '../servic
 import { JournalService, VoiceJournal } from '../services/journalService';
 import { TTSService } from '../services/tts';
 import { WaveformVisualizer } from '../components/ui/WaveformVisualizer';
+import { StreakService, StreakInfo, AVAILABLE_BADGES } from '../services/streakService';
+import { Ionicons } from '@expo/vector-icons';
+
+// Reusable elegant African Kente design accent bar
+const KenteAccent = () => (
+    <View style={{ flexDirection: 'row', height: 6, width: '100%', overflow: 'hidden', borderRadius: 3, marginBottom: 12 }}>
+        {Array.from({ length: 6 }).map((_, i) => (
+            <React.Fragment key={i}>
+                <View style={{ flex: 1, backgroundColor: '#dc2626' }} />
+                <View style={{ flex: 1, backgroundColor: '#eab308' }} />
+                <View style={{ flex: 1, backgroundColor: '#22c55e' }} />
+                <View style={{ flex: 1, backgroundColor: '#111111' }} />
+            </React.Fragment>
+        ))}
+    </View>
+);
 
 export default function JournalScreen() {
     const router = useRouter();
@@ -22,11 +38,23 @@ export default function JournalScreen() {
     const [patientId, setPatientId] = useState<string | null>(null);
     const [journals, setJournals] = useState<VoiceJournal[]>([]);
     const [loading, setLoading] = useState(true);
+    const [streakInfo, setStreakInfo] = useState<StreakInfo | null>(null);
 
     // Recording state
     const [isRecording, setIsRecording] = useState(false);
     const [isProcessing, setIsProcessing] = useState(false);
-    const recordingRef = useRef<Audio.Recording | null>(null);
+
+    // Recording hook
+    const audioRecorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
+    const recorderState = useAudioRecorderState(audioRecorder, 100);
+
+    // Metering levels sync
+    useEffect(() => {
+        if (audioRecorder.isRecording && typeof recorderState.metering === 'number') {
+            setMeteringLevels(prev => [...prev, recorderState.metering || -160].slice(-20));
+        }
+    }, [recorderState.metering, audioRecorder.isRecording]);
+
     const recordingStartTime = useRef<number>(0);
 
     const [meteringLevels, setMeteringLevels] = useState<number[]>([]);
@@ -36,8 +64,8 @@ export default function JournalScreen() {
     useEffect(() => {
         loadData();
         return () => {
-            if (recordingRef.current) {
-                recordingRef.current.stopAndUnloadAsync().catch(() => {});
+            if (audioRecorder.isRecording) {
+                audioRecorder.stop().catch(() => {});
             }
         };
     }, []);
@@ -58,8 +86,12 @@ export default function JournalScreen() {
                     setJournals(JSON.parse(localData));
                 }
             }
+            
+            // Load streak data
+            const streak = await StreakService.getStreakInfo();
+            setStreakInfo(streak);
         } catch (error) {
-            console.error('Failed to load journals', error);
+            console.error('Failed to load journals or streak data', error);
         } finally {
             setLoading(false);
         }
@@ -67,7 +99,7 @@ export default function JournalScreen() {
 
     const startRecording = async () => {
         try {
-            const { status } = await Audio.requestPermissionsAsync();
+            const { status } = await AudioModule.requestRecordingPermissionsAsync();
             if (status !== 'granted') {
                 Alert.alert('Permission needed', 'Microphone access is required to use the voice journal.');
                 return;
@@ -76,15 +108,11 @@ export default function JournalScreen() {
             setMeteringLevels([]);
             recordingStartTime.current = Date.now();
             await AudioPreprocessingService.configureAudioSession();
-            const { recording } = await Audio.Recording.createAsync(
-                ENHANCED_RECORDING_OPTIONS,
-                (status) => {
-                    if (status.metering) {
-                        setMeteringLevels(prev => [...prev, status.metering || -160].slice(-20));
-                    }
-                }
-            );
-            recordingRef.current = recording;
+            await audioRecorder.prepareToRecordAsync({
+                ...RecordingPresets.HIGH_QUALITY,
+                isMeteringEnabled: true,
+            });
+            await audioRecorder.record();
             setIsRecording(true);
             if (reduceMotion) haptics.medium(); // reduceMotion state is used for haptics toggle
             setTimer(0);
@@ -98,8 +126,7 @@ export default function JournalScreen() {
     };
 
     const stopRecording = async () => {
-        const currentRecording = recordingRef.current;
-        if (!currentRecording || !patientId) return;
+        if (!audioRecorder.isRecording || !patientId) return;
 
         setIsRecording(false);
         setIsProcessing(true);
@@ -110,9 +137,8 @@ export default function JournalScreen() {
         }
 
         try {
-            await currentRecording.stopAndUnloadAsync();
-            const uri = currentRecording.getURI();
-            recordingRef.current = null;
+            await audioRecorder.stop();
+            const uri = audioRecorder.uri;
             
             const durationSeconds = (Date.now() - recordingStartTime.current) / 1000;
 
@@ -149,6 +175,23 @@ export default function JournalScreen() {
                     
                     // Save to phone storage
                     await AsyncStorage.setItem('@voiceaid_guest_journals', JSON.stringify(updatedJournals));
+                }
+
+                // Record practice and update streaks/badges
+                try {
+                    const { streakInfo: newStreak, newlyUnlocked } = await StreakService.recordPractice('journal');
+                    setStreakInfo(newStreak);
+                    if (newlyUnlocked.length > 0) {
+                        const newlyUnlockedBadges = AVAILABLE_BADGES.filter(b => newlyUnlocked.includes(b.id));
+                        const badgeTitles = newlyUnlockedBadges.map(b => language === 'twi' ? (b.twiTitle || b.title) : language === 'ga' ? (b.gaTitle || b.title) : b.title).join(', ');
+                        Alert.alert(
+                            language === 'twi' ? 'Abasobɔdeɛ Foforo Nyaado!' : language === 'ga' ? 'Badge Foforo Hele!' : 'New Badge Unlocked!',
+                            language === 'twi' ? `Woanya abasobɔdeɛ foforo: ${badgeTitles}` : language === 'ga' ? `Ona badge foforo: ${badgeTitles}` : `You have unlocked new badges: ${badgeTitles}`,
+                            [{ text: 'Woohoo!' }]
+                        );
+                    }
+                } catch (streakErr) {
+                    console.error('[Journal] Streak tracking error:', streakErr);
                 }
             } else {
                 Alert.alert('Not understood', 'We could not hear you clearly. Please try again.');
@@ -244,6 +287,86 @@ export default function JournalScreen() {
                          </Text>
                     )}
                 </View>
+
+                {/* Streak & Achievements Section */}
+                {streakInfo && (
+                    <View style={{ marginBottom: 32 }}>
+                        {/* Streak Banner with African Kente Accent */}
+                        <View style={[styles.streakCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                            <KenteAccent />
+                            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 4 }}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 }}>
+                                    <View style={[styles.streakIconView, { backgroundColor: '#fff7ed' }]}>
+                                        <Ionicons name="flame" size={32} color="#f97316" />
+                                    </View>
+                                    <View style={{ flex: 1 }}>
+                                        <Text style={[styles.streakTitle, { color: colors.text }]} numberOfLines={1}>
+                                            {language === 'twi' ? 'Nda biara da Adesua' : language === 'ga' ? 'Daa Gbi Kasemɔ' : 'Daily Practice Streak'}
+                                        </Text>
+                                        <Text style={[styles.streakSubtitle, { color: colors.subText }]} numberOfLines={2}>
+                                            {streakInfo.currentStreak > 0 
+                                                ? (language === 'twi' ? `Woda so kura mu nda ${streakInfo.currentStreak}!` : language === 'ga' ? `Okɛ gbi ${streakInfo.currentStreak} yaa nɔ!` : `You are on a ${streakInfo.currentStreak}-day streak!`)
+                                                : (language === 'twi' ? 'Kasa da biara da na hyɛ wo streak ase!' : language === 'ga' ? 'Wiemɔ daa gbi ni oje streak shishi!' : 'Speak daily to start your streak!')
+                                            }
+                                        </Text>
+                                    </View>
+                                </View>
+                                <View style={{ alignItems: 'center', marginLeft: 8 }}>
+                                    <Text style={{ fontSize: 32, fontWeight: '900', color: '#f97316' }}>{streakInfo.currentStreak}</Text>
+                                    <Text style={{ fontSize: 10, fontWeight: '700', color: colors.subText, textTransform: 'uppercase' }}>DAYS</Text>
+                                </View>
+                            </View>
+                        </View>
+
+                        {/* Badges Shelf */}
+                        <Text style={[styles.sectionTitle, { color: colors.text, marginTop: 24, marginBottom: 12 }]}>
+                            {language === 'twi' ? 'Abasobɔdeɛ Cabin' : language === 'ga' ? 'Badge Cabin' : 'Achievement Badges'}
+                        </Text>
+                        <View style={[styles.badgeCabin, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                            <View style={styles.badgeGrid}>
+                                {AVAILABLE_BADGES.map(badge => {
+                                    const isUnlocked = streakInfo.badges.includes(badge.id);
+                                    const bTitle = language === 'twi' ? (badge.twiTitle || badge.title) : language === 'ga' ? (badge.gaTitle || badge.title) : badge.title;
+                                    const bDesc = language === 'twi' ? (badge.twiDescription || badge.description) : language === 'ga' ? (badge.gaDescription || badge.description) : badge.description;
+                                    
+                                    return (
+                                        <TouchableOpacity
+                                            key={badge.id}
+                                            style={[
+                                                styles.badgeItem, 
+                                                !isUnlocked && { opacity: 0.4 }
+                                            ]}
+                                            onPress={() => {
+                                                Alert.alert(
+                                                    bTitle,
+                                                    isUnlocked 
+                                                        ? `${bDesc}\n\n🏆 UNLOCKED`
+                                                        : `${bDesc}\n\n🔒 LOCKED (Keep practicing to unlock!)`,
+                                                    [{ text: 'OK' }]
+                                                );
+                                            }}
+                                            activeOpacity={0.8}
+                                        >
+                                            <View style={[
+                                                styles.badgeIconBg, 
+                                                { backgroundColor: isUnlocked ? badge.color + '15' : colors.border + '30' }
+                                            ]}>
+                                                <Ionicons 
+                                                    name={(isUnlocked ? badge.icon : 'lock-closed') as any} 
+                                                    size={28} 
+                                                    color={isUnlocked ? badge.color : colors.subText} 
+                                                />
+                                            </View>
+                                            <Text style={[styles.badgeItemText, { color: colors.text }]} numberOfLines={1}>
+                                                {bTitle}
+                                            </Text>
+                                        </TouchableOpacity>
+                                    );
+                                })}
+                            </View>
+                        </View>
+                    </View>
+                )}
 
                 {/* Past Entries */}
                 <View style={styles.entriesSection}>
@@ -458,5 +581,67 @@ const styles = StyleSheet.create({
         fontSize: 24,
         fontWeight: '700',
         fontFamily: 'monospace',
+    },
+    streakCard: {
+        borderRadius: 20,
+        borderWidth: 1,
+        padding: 16,
+        paddingTop: 12,
+        elevation: 2,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 8,
+    },
+    streakIconView: {
+        width: 52,
+        height: 52,
+        borderRadius: 26,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    streakTitle: {
+        fontSize: 16,
+        fontWeight: '700',
+        marginBottom: 2,
+    },
+    streakSubtitle: {
+        fontSize: 13,
+        lineHeight: 18,
+    },
+    badgeCabin: {
+        borderRadius: 20,
+        borderWidth: 1,
+        padding: 16,
+        elevation: 2,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 8,
+    },
+    badgeGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        justifyContent: 'space-between',
+        gap: 12,
+    },
+    badgeItem: {
+        width: '30%',
+        alignItems: 'center',
+        marginVertical: 8,
+    },
+    badgeIconBg: {
+        width: 56,
+        height: 56,
+        borderRadius: 28,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: 8,
+        elevation: 1,
+    },
+    badgeItemText: {
+        fontSize: 12,
+        fontWeight: '600',
+        textAlign: 'center',
     }
 });

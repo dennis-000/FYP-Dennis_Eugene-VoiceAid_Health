@@ -34,6 +34,8 @@ import { settingsStyles as styles } from '../styles/settings.styles';
 import { AppContext } from './_layout';
 import { useT } from '../utils/i18n';
 
+import KenteAccent from '../components/KenteAccent';
+
 /**
  * ==========================================
  * LOCAL COMPONENTS
@@ -42,12 +44,17 @@ import { useT } from '../utils/i18n';
 const Header = ({ title, onBack }: { title: string, onBack: () => void }) => {
   const { colors } = useContext(AppContext);
   return (
-    <View style={[styles.header, { backgroundColor: colors.bg, borderBottomColor: colors.border }]}>
-      <TouchableOpacity onPress={onBack} style={styles.backBtn}>
-        <ArrowLeft size={24} color={colors.text} />
-      </TouchableOpacity>
-      <Text style={[styles.headerTitle, { color: colors.text }]}>{title}</Text>
-      <View style={{ width: 24 }} />
+    <View style={{ backgroundColor: colors.bg }}>
+      <View style={[styles.header, { backgroundColor: colors.bg, borderBottomColor: 'transparent', height: 60 }]}>
+        <TouchableOpacity onPress={onBack} style={styles.backBtn}>
+          <ArrowLeft size={24} color={colors.text} />
+        </TouchableOpacity>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>{title}</Text>
+        <View style={{ width: 24 }} />
+      </View>
+      <View style={{ paddingHorizontal: 16, marginTop: -4, marginBottom: 4 }}>
+        <KenteAccent />
+      </View>
     </View>
   );
 };
@@ -83,7 +90,7 @@ export default function SettingsScreen() {
   } = useContext(AppContext);
 
   const tr = useT(language as any);
-  const { role, setRole, patientType } = useRole();
+  const { role, setRole, patientType, setPatientType } = useRole();
   const isGuest = role === 'patient' && patientType === 'guest';
   const { signOut } = useAuth();
 
@@ -98,14 +105,27 @@ export default function SettingsScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
+              // 1. Service signOut (cleans up auth context & push notifications)
               await signOut();
+            } catch (error) {
+              console.warn('SignOut service failed/ignored:', error);
+            }
+
+            try {
+              // 2. Clear global provider roles so that layout triggers reactivity
+              await setRole(null);
+              await setPatientType(null);
+
+              // 3. Force clean local storage just in case
               const AsyncStorage = require('@react-native-async-storage/async-storage').default;
               await AsyncStorage.removeItem('@voiceaid_role');
               await AsyncStorage.removeItem('@voiceaid_patient_type');
+
+              // 4. Redirect safely to the welcome screen
               router.replace('/welcome');
             } catch (error) {
-              console.error('Error logging out:', error);
-              Alert.alert(tr('error'), tr('error'));
+              console.error('Error clearing local role state:', error);
+              router.replace('/welcome');
             }
           }
         }

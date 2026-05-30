@@ -216,7 +216,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
 
     const signOut = async () => {
-        await supabase.auth.signOut();
+        try {
+            await supabase.auth.signOut();
+        } catch (e) {
+            console.warn('Supabase signOut failed or no session:', e);
+        }
         setUser(null);
         setSession(null);
         setUserType(null);

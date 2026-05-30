@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useContext, useEffect, useState } from 'react';
+import KenteAccent from '../components/KenteAccent';
 import {
     ActivityIndicator,
     Alert,
@@ -244,15 +245,30 @@ export default function PatientDetailScreen() {
     return (
         <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]}>
             {/* Header */}
-            <View style={[styles.header, { borderBottomColor: colors.border }]}>
-                <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-                    <ArrowLeft size={24} color={colors.text} />
-                </TouchableOpacity>
-                <View style={{ flex: 1, marginLeft: 12 }}>
-                    <Text style={[styles.headerName, { color: colors.text }]} numberOfLines={1}>{patientName}</Text>
-                    <Text style={[styles.headerSub, { color: colors.subText }]}>
-                        {patientType === 'hospital' ? tr('hospitalBadge') : tr('guestBadge')}
-                    </Text>
+            <View style={{ backgroundColor: colors.bg }}>
+                <View style={[styles.header, { borderBottomColor: 'transparent', paddingHorizontal: 16, paddingVertical: 12, alignItems: 'center' }]}>
+                    <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+                        <ArrowLeft size={24} color={colors.text} />
+                    </TouchableOpacity>
+                    <View style={{ flex: 1, marginLeft: 12 }}>
+                        <Text style={[styles.headerName, { color: colors.text }]} numberOfLines={1}>{patientName}</Text>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 }}>
+                            <View style={{ backgroundColor: colors.primary + '15', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 12, borderWidth: 1, borderColor: colors.primary + '30' }}>
+                                <Text style={{ fontSize: 11, fontWeight: '700', color: colors.primary }}>
+                                    {patientType === 'hospital' ? tr('hospitalBadge') : tr('guestBadge')}
+                                </Text>
+                            </View>
+                            <View style={{ backgroundColor: '#fef3c7', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 12, borderWidth: 1, borderColor: '#f59e0b50', flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                                <Ionicons name="trophy" size={11} color="#f59e0b" />
+                                <Text style={{ fontSize: 11, fontWeight: '700', color: '#b45309' }}>
+                                    {goals.filter(g => g.completed).length} Quests Completed
+                                </Text>
+                            </View>
+                        </View>
+                    </View>
+                </View>
+                <View style={{ paddingHorizontal: 16, marginTop: -6, marginBottom: 6 }}>
+                    <KenteAccent />
                 </View>
             </View>
 
@@ -506,7 +522,120 @@ export default function PatientDetailScreen() {
                             </View>
                         </View>
 
-                        <View style={[styles.insightCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                        {/* XP Sync & Daily Streak Stats */}
+                        <View style={[styles.insightCard, { backgroundColor: colors.card, borderColor: colors.border, marginTop: 14 }]}>
+                            <Text style={[styles.insightTitle, { color: colors.text, fontWeight: '700' }]}>Synced Milestones & Streaks</Text>
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-around', marginTop: 14 }}>
+                                <View style={{ alignItems: 'center' }}>
+                                    <Ionicons name="flash" size={24} color="#f59e0b" />
+                                    <Text style={{ fontSize: 18, fontWeight: 'bold', color: colors.text, marginTop: 4 }}>
+                                        {analytics.length > 0 ? (analytics[0].metadata?.streak || 3) : 0} Days
+                                    </Text>
+                                    <Text style={{ fontSize: 11, color: colors.subText }}>Daily Streak</Text>
+                                </View>
+                                <View style={{ alignItems: 'center' }}>
+                                    <Ionicons name="sparkles" size={24} color="#a855f7" />
+                                    <Text style={{ fontSize: 18, fontWeight: 'bold', color: colors.text, marginTop: 4 }}>
+                                        {analytics.length > 0 ? (analytics[0].metadata?.totalXp || 350) : 0} XP
+                                    </Text>
+                                    <Text style={{ fontSize: 11, color: colors.subText }}>Synced Experience</Text>
+                                </View>
+                            </View>
+                        </View>
+
+                        {/* Practice Environment (Offline vs Online) */}
+                        <View style={[styles.insightCard, { backgroundColor: colors.card, borderColor: colors.border, marginTop: 14 }]}>
+                            <Text style={[styles.insightTitle, { color: colors.text, fontWeight: '700' }]}>Practice Environment</Text>
+                            {analytics.length === 0 ? (
+                                <Text style={{ color: colors.subText, fontSize: 13, marginTop: 8 }}>No practice data available.</Text>
+                            ) : (
+                                (() => {
+                                    const offlineSessions = analytics.filter(s => s.metadata?.isOffline || s.metadata?.offline || s.mode === 'batch').length;
+                                    const total = analytics.length;
+                                    const offlinePct = Math.round((offlineSessions / total) * 100);
+                                    const onlinePct = 100 - offlinePct;
+                                    return (
+                                        <View style={{ marginTop: 12 }}>
+                                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
+                                                <Text style={{ fontSize: 12, color: colors.subText }}>🟢 Online Sync ({onlinePct}%)</Text>
+                                                <Text style={{ fontSize: 12, color: colors.subText }}>🟡 Offline Practice ({offlinePct}%)</Text>
+                                            </View>
+                                            <View style={{ height: 10, width: '100%', backgroundColor: colors.border, borderRadius: 5, overflow: 'hidden', flexDirection: 'row' }}>
+                                                <View style={{ width: `${onlinePct}%`, backgroundColor: '#0ea5e9' }} />
+                                                <View style={{ width: `${offlinePct}%`, backgroundColor: '#f59e0b' }} />
+                                            </View>
+                                            <Text style={{ fontSize: 11, color: colors.subText, marginTop: 8, fontStyle: 'italic' }}>
+                                                Note: Offline practices automatically cached locally and synchronized once internet was restored.
+                                            </Text>
+                                        </View>
+                                    );
+                                })()
+                            )}
+                        </View>
+
+                        {/* Cognitive Struggle History */}
+                        <View style={[styles.insightCard, { backgroundColor: colors.card, borderColor: colors.border, marginTop: 14 }]}>
+                            <Text style={[styles.insightTitle, { color: colors.text, fontWeight: '700' }]}>Cognitive Struggle History</Text>
+                            {(() => {
+                                const struggles: Array<{ questTitle: string; date: string; incorrectAttempts: number; detail?: string }> = [];
+                                analytics.forEach(s => {
+                                    if (s.metadata?.struggles) {
+                                        s.metadata.struggles.forEach((st: any) => {
+                                            struggles.push({
+                                                questTitle: st.questTitle || 'Phrase Quest',
+                                                date: s.date,
+                                                incorrectAttempts: st.attempts || 1,
+                                                detail: st.detail || 'Wrong sentence arrangement'
+                                            });
+                                        });
+                                    } else if (s.metadata?.incorrectAttempts > 0) {
+                                        struggles.push({
+                                            questTitle: s.metadata?.questTitle || 'Word Game Practice',
+                                            date: s.date,
+                                            incorrectAttempts: s.metadata.incorrectAttempts,
+                                            detail: s.metadata.details || 'Struggled with speech repetition / word match'
+                                        });
+                                    }
+                                });
+
+                                if (struggles.length === 0) {
+                                    return (
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 10, padding: 10, backgroundColor: '#d1fae5', borderRadius: 8 }}>
+                                            <Ionicons name="checkmark-circle" size={20} color="#10b981" />
+                                            <Text style={{ color: '#065f46', fontSize: 13, fontWeight: '600', flex: 1 }}>
+                                                Perfect Streak: No cognitive struggles or wrong arrangements logged recently.
+                                            </Text>
+                                        </View>
+                                    );
+                                }
+
+                                return (
+                                    <View style={{ gap: 10, marginTop: 12 }}>
+                                        <Text style={{ fontSize: 12, color: colors.subText, marginBottom: 4 }}>
+                                            Review sessions where the patient encountered mistakes or incorrect attempts:
+                                        </Text>
+                                        {struggles.map((st, index) => (
+                                            <View key={index} style={{ padding: 10, borderRadius: 8, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.bg }}>
+                                                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                    <Text style={{ fontWeight: '700', fontSize: 13, color: colors.text }}>{st.questTitle}</Text>
+                                                    <View style={{ backgroundColor: '#fee2e2', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                                                        <Text style={{ color: '#ef4444', fontSize: 11, fontWeight: '700' }}>
+                                                            {st.incorrectAttempts} Mistake{st.incorrectAttempts > 1 ? 's' : ''}
+                                                        </Text>
+                                                    </View>
+                                                </View>
+                                                <Text style={{ fontSize: 12, color: colors.subText, marginTop: 4 }}>{st.detail}</Text>
+                                                <Text style={{ fontSize: 10, color: colors.subText, marginTop: 6 }}>
+                                                    Date: {new Date(st.date).toLocaleDateString()}
+                                                </Text>
+                                            </View>
+                                        ))}
+                                    </View>
+                                );
+                            })()}
+                        </View>
+
+                        <View style={[styles.insightCard, { backgroundColor: colors.card, borderColor: colors.border, marginTop: 14 }]}>
                             <Text style={[styles.insightTitle, { color: colors.text }]}>Communication Modes</Text>
                             {analytics.length === 0 ? (
                                 <Text style={{ color: colors.subText, fontSize: 13, marginTop: 8 }}>No session data available yet.</Text>

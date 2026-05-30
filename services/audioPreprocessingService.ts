@@ -8,35 +8,15 @@
  * - Recording settings for speech-impaired users
  */
 
-import { Audio } from 'expo-av';
+import { setAudioModeAsync, RecordingPresets } from 'expo-audio';
 
 /**
  * Optimized recording options for speech-impaired users
  * These settings prioritize clarity and noise reduction
  */
-export const ENHANCED_RECORDING_OPTIONS: Audio.RecordingOptions = {
-    android: {
-        extension: '.wav',
-        outputFormat: Audio.AndroidOutputFormat.MPEG_4,
-        audioEncoder: Audio.AndroidAudioEncoder.AAC,
-        sampleRate: 44100,
-        numberOfChannels: 1,
-        bitRate: 256000,
-    },
-    ios: {
-        extension: '.wav',
-        audioQuality: Audio.IOSAudioQuality.HIGH,
-        sampleRate: 44100,
-        numberOfChannels: 1,
-        bitRate: 256000,
-        linearPCMBitDepth: 16,
-        linearPCMIsBigEndian: false,
-        linearPCMIsFloat: false,
-    },
-    web: {
-        mimeType: 'audio/webm',
-        bitsPerSecond: 128000,
-    }
+export const ENHANCED_RECORDING_OPTIONS = {
+    ...RecordingPresets.HIGH_QUALITY,
+    isMeteringEnabled: true,
 };
 
 export interface AudioPreprocessingConfig {
@@ -72,13 +52,10 @@ export const AudioPreprocessingService = {
      */
     configureAudioSession: async () => {
         try {
-            await Audio.setAudioModeAsync({
-                allowsRecordingIOS: true,
-                playsInSilentModeIOS: true,
-                staysActiveInBackground: false,
-                shouldDuckAndroid: true,
-                playThroughEarpieceAndroid: false,
-                // These settings help with noise reduction on iOS
+            await setAudioModeAsync({
+                playsInSilentMode: true,
+                shouldPlayInBackground: false,
+                allowsRecording: true,
             });
 
             console.log('[Audio Preprocessing] ✅ Audio session configured for optimal recording');

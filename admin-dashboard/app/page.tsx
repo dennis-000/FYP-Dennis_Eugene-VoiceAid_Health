@@ -101,7 +101,7 @@ export default function HomePage() {
                 ...(recentPatientsFull.data || []).map(p => new Date(p.created_at))
             ];
 
-            const days = [];
+            const days: string[] = [];
             const counts = [0, 0, 0, 0, 0, 0, 0];
             const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 

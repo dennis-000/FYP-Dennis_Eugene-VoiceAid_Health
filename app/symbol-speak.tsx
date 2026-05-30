@@ -7,6 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { TTSService } from '../services/tts';
 import { useT } from '../utils/i18n';
 import { AppContext } from './_layout';
+import KenteAccent from '../components/KenteAccent';
 
 type SymbolItem = {
     id: string;
@@ -111,14 +112,19 @@ export default function SymbolSpeakScreen() {
     return (
         <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]}>
             {/* Header */}
-            <View style={[styles.header, { borderBottomColor: colors.border }]}>
-                <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-                    <ArrowLeft size={24} color={colors.text} />
-                </TouchableOpacity>
-                <Text style={[styles.headerTitle, { color: colors.text }]}>
-                    {tr('symbolSpeak')}
-                </Text>
-                <View style={{ width: 40 }} />
+            <View style={{ backgroundColor: colors.bg }}>
+                <View style={[styles.header, { borderBottomColor: 'transparent', height: 60 }]}>
+                    <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+                        <ArrowLeft size={24} color={colors.text} />
+                    </TouchableOpacity>
+                    <Text style={[styles.headerTitle, { color: colors.text }]}>
+                        {tr('symbolSpeak')}
+                    </Text>
+                    <View style={{ width: 40 }} />
+                </View>
+                <View style={{ paddingHorizontal: 16, marginTop: -4, marginBottom: 4 }}>
+                    <KenteAccent />
+                </View>
             </View>
 
             {/* Sentence Builder Area */}

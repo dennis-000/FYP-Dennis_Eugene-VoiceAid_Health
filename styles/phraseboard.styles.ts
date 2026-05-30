@@ -1,4 +1,5 @@
 import { StyleSheet } from 'react-native';
+import { createShadow } from '../utils/shadows';
 
 export const phraseboardStyles = StyleSheet.create({
     container: { flex: 1 },
@@ -37,11 +38,7 @@ export const phraseboardStyles = StyleSheet.create({
         borderWidth: 1,
         alignItems: 'center',
         justifyContent: 'center',
-        elevation: 2,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
+        ...createShadow('#000', 0, 2, 0.1, 4, 2),
         position: 'relative',
         padding: 10
     },

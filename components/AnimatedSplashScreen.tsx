@@ -6,9 +6,9 @@ import {
   Animated, 
   Dimensions, 
   Easing,
-  Platform 
+  Platform,
+  Image
 } from 'react-native';
-import { Heart, AudioLines } from 'lucide-react-native';
 import { THEMES } from '../constants/theme';
 
 const { width } = Dimensions.get('window');
@@ -82,7 +82,7 @@ export default function AnimatedSplashScreen({ onAnimationFinish }: SplashScreen
             transform: [{ scale: pulseAnim }],
             opacity: textAnim.interpolate({
               inputRange: [0, 1],
-              outputRange: [0, 0.15] 
+              outputRange: [0, 0.25] 
             }) 
           }
         ]} 
@@ -91,28 +91,11 @@ export default function AnimatedSplashScreen({ onAnimationFinish }: SplashScreen
       {/* Main Logo Container */}
       <Animated.View style={{ transform: [{ scale: scaleAnim }], alignItems: 'center' }}>
         <View style={styles.logoCircle}>
-          
-          {/* LOGO: Health (Heart) + Voice (AudioLines) */}
-          <View style={{ alignItems: 'center', justifyContent: 'center' }}>
-            {/* The Heart Shape */}
-            <Heart 
-              size={68} 
-              color={THEMES.light.primary} 
-              fill={THEMES.light.primary}
-              fillOpacity={0.1} // Soft fill inside
-              strokeWidth={2}
-              style={{ position: 'absolute' }}
-            />
-            
-            {/* The Voice Wave inside the Heart */}
-            <AudioLines 
-              size={32} 
-              color={THEMES.light.primary} 
-              strokeWidth={3}
-              style={{ marginTop: 2 }} // Visual centering
-            />
-          </View>
-
+          <Image 
+            source={require('../assets/images/splash-icon.png')} 
+            style={{ width: 100, height: 100, borderRadius: 20 }}
+            resizeMode="contain"
+          />
         </View>
 
         {/* Text Container */}
@@ -133,7 +116,7 @@ export default function AnimatedSplashScreen({ onAnimationFinish }: SplashScreen
 const styles = StyleSheet.create({
   container: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: THEMES.light.primary, 
+    backgroundColor: '#E6F4FE', 
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 9999, 
@@ -152,29 +135,28 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
-    // High Elevation for "floating" effect
     elevation: 20,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.15,
     shadowRadius: 10,
   },
   title: {
     fontSize: 36,
-    fontWeight: '800', // Extra bold
-    color: '#FFFFFF',
+    fontWeight: '800', 
+    color: '#0f172a',
     letterSpacing: 1.5,
     marginTop: 10,
   },
   subtitle: {
     fontSize: 16,
-    fontWeight: '500',
-    color: '#E0E7FF', 
+    fontWeight: '600',
+    color: '#0284c7', 
     letterSpacing: 0.5,
     marginTop: 4
   },
   footer: {
-    color: 'rgba(255,255,255,0.7)',
+    color: '#64748b',
     fontSize: 12,
     fontWeight: '600',
     letterSpacing: 1

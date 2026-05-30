@@ -20,6 +20,8 @@ import { PatientProfile, useAuth } from '../contexts/AuthContext';
 import { AppContext } from './_layout';
 import { useT } from '../utils/i18n';
 
+import KenteAccent from '../components/KenteAccent';
+
 export default function MyPatientsScreen() {
     const router = useRouter();
     const { colors, language } = useContext(AppContext);
@@ -52,18 +54,23 @@ export default function MyPatientsScreen() {
     return (
         <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]}>
             {/* Header */}
-            <View style={[styles.header, { borderBottomColor: colors.border }]}>
-                <TouchableOpacity
-                    onPress={() => router.back()}
-                    style={styles.backButton}
-                    activeOpacity={0.7}
-                >
-                    <ArrowLeft size={24} color={colors.text} />
-                </TouchableOpacity>
-                <Text style={[styles.headerTitle, { color: colors.text }]}>
-                    {tr('myPatients')}
-                </Text>
-                <View style={{ width: 24 }} />
+            <View style={{ backgroundColor: colors.bg }}>
+                <View style={[styles.header, { borderBottomColor: 'transparent', height: 60, paddingHorizontal: 16, alignItems: 'center' }]}>
+                    <TouchableOpacity
+                        onPress={() => router.back()}
+                        style={styles.backButton}
+                        activeOpacity={0.7}
+                    >
+                        <ArrowLeft size={24} color={colors.text} />
+                    </TouchableOpacity>
+                    <Text style={[styles.headerTitle, { color: colors.text }]}>
+                        {tr('myPatients')}
+                    </Text>
+                    <View style={{ width: 24 }} />
+                </View>
+                <View style={{ paddingHorizontal: 16, marginTop: -4, marginBottom: 4 }}>
+                    <KenteAccent />
+                </View>
             </View>
 
             {/* Patient List */}

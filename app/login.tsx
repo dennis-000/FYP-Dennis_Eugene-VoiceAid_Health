@@ -23,6 +23,20 @@ import { createTherapistProfile } from '../services/profileService';
 import { AppContext } from './_layout';
 import { useT } from '../utils/i18n';
 
+// Reusable elegant African Kente design accent bar
+const KenteAccent = () => (
+    <View style={{ flexDirection: 'row', height: 6, width: '100%', overflow: 'hidden', borderRadius: 3, marginVertical: 14 }}>
+        {Array.from({ length: 6 }).map((_, i) => (
+            <React.Fragment key={i}>
+                <View style={{ flex: 1, backgroundColor: '#dc2626' }} />
+                <View style={{ flex: 1, backgroundColor: '#eab308' }} />
+                <View style={{ flex: 1, backgroundColor: '#22c55e' }} />
+                <View style={{ flex: 1, backgroundColor: '#111111' }} />
+            </React.Fragment>
+        ))}
+    </View>
+);
+
 export default function LoginScreen() {
     const router = useRouter();
     const { colors, language } = useContext(AppContext);
@@ -193,6 +207,7 @@ export default function LoginScreen() {
                             <Text style={[styles.subtitle, { color: colors.subText }]}>
                                 {isSignUp ? tr('therapistSubtitle') : tr('therapistSubtitle')}
                             </Text>
+                            <KenteAccent />
                         </View>
 
                         {/* Form */}

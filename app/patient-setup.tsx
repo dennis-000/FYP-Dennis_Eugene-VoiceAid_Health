@@ -23,6 +23,8 @@ import { welcomeStyles as styles } from '../styles/welcome.styles';
 import { AppContext } from './_layout';
 import { useT } from '../utils/i18n';
 
+import KenteAccent from '../components/KenteAccent';
+
 export default function PatientSetupScreen() {
     const router = useRouter();
     const { colors, language } = useContext(AppContext);
@@ -81,6 +83,7 @@ export default function PatientSetupScreen() {
                     <Text style={[styles.subtitle, { color: colors.subText }]}>
                         {tr('howUseVoiceAid')}
                     </Text>
+                    <KenteAccent />
                 </View>
 
                 {/* Patient Type Selection */}

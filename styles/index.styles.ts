@@ -1,4 +1,5 @@
 import { StyleSheet } from 'react-native';
+import { createShadow } from '../utils/shadows';
 
 export const homeStyles = StyleSheet.create({
     container: { flex: 1 },
@@ -9,11 +10,7 @@ export const homeStyles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'flex-start',
         borderBottomWidth: 1,
-        elevation: 1,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.05,
-        shadowRadius: 2,
+        ...createShadow('#000', 0, 1, 0.05, 2, 1),
     },
     headerTitle: { fontSize: 18, fontWeight: '800' },
     scrollContent: { paddingBottom: 40 },

@@ -32,26 +32,28 @@ import { useT } from '../utils/i18n';
 
 const { width } = Dimensions.get('window');
 
-/**
- * ==========================================
- * SHARED COMPONENTS
- * ==========================================
- */
+import KenteAccent from '../components/KenteAccent';
+
 const Header = ({ title, onBack, onClear, showClear = false }: any) => {
     const { colors, largeText } = useContext(AppContext);
     const scale = largeText ? 1.25 : 1;
 
     return (
-        <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border + '50' }]}>
-            <TouchableOpacity onPress={onBack} style={styles.backBtn}>
-                <ArrowLeft size={24 * scale} color={colors.text} />
-            </TouchableOpacity>
-            <Text style={[styles.headerTitle, { color: colors.text, fontSize: 18 * scale }]}>{title}</Text>
-            {showClear ? (
-                <TouchableOpacity onPress={onClear} style={styles.clearBtn}>
-                    <Trash2 size={24 * scale} color={colors.danger || '#EF4444'} />
+        <View style={{ backgroundColor: colors.card }}>
+            <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: 'transparent', height: 60 }]}>
+                <TouchableOpacity onPress={onBack} style={styles.backBtn}>
+                    <ArrowLeft size={24 * scale} color={colors.text} />
                 </TouchableOpacity>
-            ) : <View style={{ width: 24 * scale }} />}
+                <Text style={[styles.headerTitle, { color: colors.text, fontSize: 18 * scale }]}>{title}</Text>
+                {showClear ? (
+                    <TouchableOpacity onPress={onClear} style={styles.clearBtn}>
+                        <Trash2 size={24 * scale} color={colors.danger || '#EF4444'} />
+                    </TouchableOpacity>
+                ) : <View style={{ width: 24 * scale }} />}
+            </View>
+            <View style={{ paddingHorizontal: 16, marginTop: -4, marginBottom: 4 }}>
+                <KenteAccent />
+            </View>
         </View>
     );
 };

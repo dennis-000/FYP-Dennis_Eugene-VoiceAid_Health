@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Activity, BookOpen, Calendar, ChevronRight, ClipboardList, Dumbbell, Grid, HeartPulse, LogOut, Mic, Phone, Settings, Wand2 } from 'lucide-react-native';
+import { Activity, BookOpen, Calendar, ChevronRight, ClipboardList, Dumbbell, Grid, HeartPulse, LogOut, Mic, Phone, Settings, Wand2, Gamepad2, Layers } from 'lucide-react-native';
 import React, { useContext, useEffect, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View, GestureResponderEvent } from 'react-native';
 import { AppContext } from '../../app/_layout';
@@ -10,6 +10,10 @@ import { DailyTip } from './DailyTip';
 import { MoodCheckIn } from './MoodCheckIn';
 import { TTSService } from '../../services/tts';
 import { haptics } from '../../utils/haptics';
+import { useNavigation } from 'expo-router';
+import { StreakService, StreakInfo } from '../../services/streakService';
+import { Ionicons } from '@expo/vector-icons';
+import { useNetworkStatus } from '../../utils/network';
 
 interface PatientDashboardProps {
     router: any;
@@ -20,6 +24,20 @@ interface PatientDashboardProps {
     largeText?: boolean;
 }
 
+// Reusable elegant African Kente design accent bar
+const KenteAccent = () => (
+    <View style={{ flexDirection: 'row', height: 6, width: '100%', overflow: 'hidden', borderRadius: 3, marginBottom: 12 }}>
+        {Array.from({ length: 6 }).map((_, i) => (
+            <React.Fragment key={i}>
+                <View style={{ flex: 1, backgroundColor: '#dc2626' }} />
+                <View style={{ flex: 1, backgroundColor: '#eab308' }} />
+                <View style={{ flex: 1, backgroundColor: '#22c55e' }} />
+                <View style={{ flex: 1, backgroundColor: '#111111' }} />
+            </React.Fragment>
+        ))}
+    </View>
+);
+
 export const PatientDashboard: React.FC<PatientDashboardProps> = ({
     router,
     colors,
@@ -28,13 +46,16 @@ export const PatientDashboard: React.FC<PatientDashboardProps> = ({
     patientType,
     largeText = false
 }) => {
+    const navigation = useNavigation();
     const { setRole, setPatientType: setContextPatientType } = useRole();
     const scale = largeText ? 1.25 : 1;
     const tr = useT(language as any);
+    const isOnline = useNetworkStatus();
     const [patientName, setPatientName] = useState<string>('Patient');
     const [patientCode, setPatientCode] = useState<string | null>(null);
     const [patientId, setPatientId] = useState<string | null>(null);
     const [caregiverName, setCaregiverName] = useState<string | null>(null);
+    const [streakInfo, setStreakInfo] = useState<StreakInfo | null>(null);
 
     // Scanning Engine State
     const { isScanningMode, ttsSpeed, ttsVoice } = useContext(AppContext);
@@ -46,6 +67,9 @@ export const PatientDashboard: React.FC<PatientDashboardProps> = ({
         { id: 'phraseboard', route: '/phraseboard' },
         { id: 'symbol-speak', route: '/symbol-speak' },
         { id: 'journal', route: '/journal' },
+        { id: 'therapy-word-game', route: '/therapy-word-game' },
+        { id: 'phrase-builder-quest', route: '/phrase-builder-quest' },
+        { id: 'exercise-trainer', route: '/exercise-trainer' },
         ...(patientType === 'hospital' ? [{ id: 'my-assignments', route: '/my-assignments' }] : []),
         { id: 'history', route: '/history' },
         { id: 'settings', route: '/settings' },
@@ -72,7 +96,6 @@ export const PatientDashboard: React.FC<PatientDashboardProps> = ({
         }
         return () => clearInterval(interval);
     }, [isScanningMode, isScanningPaused, patientType, language, ttsSpeed, ttsVoice]);
-
     const announceItem = (index: number) => {
         const item = scannerItems[index];
         if (!item) return;
@@ -82,6 +105,9 @@ export const PatientDashboard: React.FC<PatientDashboardProps> = ({
             'phraseboard': tr('phraseBoard'),
             'symbol-speak': tr('symbolSpeak'),
             'journal': tr('voiceJournal'),
+            'therapy-word-game': language === 'twi' ? 'Nsɛmfua Agofua' : language === 'ga' ? 'Wiemɔi Shwɛmɔ' : 'Word Game',
+            'phrase-builder-quest': language === 'twi' ? 'Kasa Nhyehyɛeɛ' : language === 'ga' ? 'Wiemɔ Saji Kpeemɔ' : 'Phrase Quest',
+            'exercise-trainer': tr('exercises'),
             'my-assignments': tr('myAssignments'),
             'history': tr('history'),
             'settings': tr('settings'),
@@ -102,9 +128,26 @@ export const PatientDashboard: React.FC<PatientDashboardProps> = ({
         return isHighlighted(id) ? { borderColor: colors.primary, borderWidth: 4 } : {};
     };
 
+    const loadStreak = async () => {
+        try {
+            const streak = await StreakService.getStreakInfo();
+            setStreakInfo(streak);
+        } catch (err) {
+            console.error('Failed to load streak in dashboard', err);
+        }
+    };
+
     useEffect(() => {
         loadPatientData();
-    }, []);
+        loadStreak();
+
+        // Listen to screen focus events to reload data dynamically
+        const unsubscribe = navigation.addListener('focus', () => {
+            loadPatientData();
+            loadStreak();
+        });
+        return unsubscribe;
+    }, [navigation]);
 
     const loadPatientData = async () => {
         try {
@@ -117,18 +160,18 @@ export const PatientDashboard: React.FC<PatientDashboardProps> = ({
                 const pId = await AsyncStorage.getItem('@voiceaid_patient_id');
                 if (pId) {
                     setPatientId(pId);
-                    // Fetch caregiver info
+                    // Fetch caregiver info — use pId directly (not patientId state, which is stale here)
                     const { data: patientData } = await supabase
                         .from('patient_profiles')
-                        .select('assigned_therapist_id')
-                        .eq('id', patientId)
+                        .select('therapist_id')
+                        .eq('id', pId)
                         .single();
 
-                    if (patientData?.assigned_therapist_id) {
+                    if (patientData?.therapist_id) {
                         const { data: therapistData } = await supabase
                             .from('therapist_profiles')
                             .select('full_name, organization')
-                            .eq('id', patientData.assigned_therapist_id)
+                            .eq('id', patientData.therapist_id)
                             .single();
 
                         if (therapistData) {
@@ -172,11 +215,35 @@ export const PatientDashboard: React.FC<PatientDashboardProps> = ({
             >
                 {/* Header */}
                 <View style={styles.header}>
-                    <View>
+                    <View style={{ flex: 1, marginRight: 8 }}>
                         <Text style={[styles.welcomeText, { color: colors.subText, fontSize: 16 * scale }]}>{tr('welcomeBack')}</Text>
-                        <Text style={[styles.nameText, { color: colors.text, fontSize: 32 * scale, fontWeight: '800' }]}>{patientName}</Text>
+                        <Text style={[styles.nameText, { color: colors.text, fontSize: 32 * scale, fontWeight: '800' }]} numberOfLines={1}>{patientName}</Text>
                     </View>
                     <View style={{ alignItems: 'flex-end', gap: 6 }}>
+                        {streakInfo && streakInfo.currentStreak > 0 && (
+                            <View style={{
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                backgroundColor: '#fff7ed',
+                                paddingHorizontal: 10,
+                                paddingVertical: 4,
+                                borderRadius: 12,
+                                borderWidth: 1,
+                                borderColor: '#ffedd5',
+                                gap: 4,
+                                shadowColor: '#f97316',
+                                shadowOffset: { width: 0, height: 2 },
+                                shadowOpacity: 0.15,
+                                shadowRadius: 4,
+                                elevation: 2,
+                                marginBottom: 4
+                            }}>
+                                <Ionicons name="flame" size={16} color="#f97316" />
+                                <Text style={{ fontSize: 13, fontWeight: '900', color: '#ea580c' }}>
+                                    {streakInfo.currentStreak} {language === 'twi' ? 'Nda' : language === 'ga' ? 'Gbi' : 'Days'}!
+                                </Text>
+                            </View>
+                        )}
                         <View style={[styles.typeBadge, { backgroundColor: colors.primary + '15', borderColor: colors.primary + '30' }]}>
                             <Text style={[styles.typeText, { color: colors.primary }]}>
                                 {patientType === 'hospital' ? tr('hospitalPatient') : tr('guestPatient')}
@@ -276,6 +343,121 @@ export const PatientDashboard: React.FC<PatientDashboardProps> = ({
                     </View>
                 </TouchableOpacity>
 
+                {/* Gamified Practice & Speech Games */}
+                <View style={styles.section}>
+                    <Text style={[styles.sectionTitle, { color: colors.text, fontSize: 18 * scale }]}>
+                        {language === 'twi' ? 'Nnwuma ne Agofua' : language === 'ga' ? 'Nitsumɔi kɛ Shwɛmɔi' : 'Speech Games & Quests'}
+                    </Text>
+                    
+                    <KenteAccent />
+
+                    <View style={styles.toolsGrid}>
+                        {/* Therapy Word Game */}
+                        <TouchableOpacity
+                            onPress={() => {
+                                haptics.selection();
+                                router.push('/therapy-word-game');
+                            }}
+                            activeOpacity={0.8}
+                            style={[
+                                styles.toolCard,
+                                getHighlightStyle('therapy-word-game'),
+                                { 
+                                    backgroundColor: colors.card,
+                                    borderColor: '#ca8a04',
+                                    borderWidth: 1.5,
+                                    shadowColor: '#ca8a04',
+                                    shadowOpacity: 0.1,
+                                    shadowOffset: { width: 0, height: 4 },
+                                    shadowRadius: 6
+                                }
+                            ]}
+                        >
+                            <View style={{
+                                position: 'absolute',
+                                top: 8,
+                                right: 8,
+                                backgroundColor: isOnline ? '#ccfbf1' : '#f3f4f6',
+                                paddingHorizontal: 6,
+                                paddingVertical: 2,
+                                borderRadius: 8,
+                                borderWidth: 0.5,
+                                borderColor: isOnline ? '#99f6e4' : '#e5e7eb',
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                gap: 2,
+                                zIndex: 10
+                            }}>
+                                <Ionicons name={isOnline ? "sync-outline" : "wifi-outline"} size={10} color={isOnline ? "#0f766e" : "#4b5563"} />
+                                <Text style={{ fontSize: 9, fontWeight: '900', color: isOnline ? "#0f766e" : "#4b5563", textTransform: 'uppercase' }}>
+                                    {isOnline ? "🟢 Online Sync" : "🟡 Offline Mode"}
+                                </Text>
+                            </View>
+                            <View style={[styles.toolIcon, { backgroundColor: '#fef9c3', marginTop: 8 }]}>
+                                <Gamepad2 size={24} color="#ca8a04" strokeWidth={2.5} />
+                            </View>
+                            <Text style={[styles.toolText, { color: colors.text, fontSize: 15 * scale }]}>
+                                {language === 'twi' ? 'Nsɛmfua Agofua' : language === 'ga' ? 'Wiemɔi Shwɛmɔ' : 'Word Game'}
+                            </Text>
+                            <Text style={[styles.toolSubText, { fontSize: 12 * scale, color: colors.subText }]}>
+                                {language === 'twi' ? 'Kasa kyerɛ mfonini' : language === 'ga' ? 'Kanemɔ wiemɔi' : 'Speak to match cards'}
+                            </Text>
+                        </TouchableOpacity>
+
+                        {/* Phrase Builder Quest */}
+                        <TouchableOpacity
+                            onPress={() => {
+                                haptics.selection();
+                                router.push('/phrase-builder-quest');
+                            }}
+                            activeOpacity={0.8}
+                            style={[
+                                styles.toolCard,
+                                getHighlightStyle('phrase-builder-quest'),
+                                { 
+                                    backgroundColor: colors.card,
+                                    borderColor: '#16a34a',
+                                    borderWidth: 1.5,
+                                    shadowColor: '#16a34a',
+                                    shadowOpacity: 0.1,
+                                    shadowOffset: { width: 0, height: 4 },
+                                    shadowRadius: 6
+                                }
+                            ]}
+                        >
+                            <View style={{
+                                position: 'absolute',
+                                top: 8,
+                                right: 8,
+                                backgroundColor: isOnline ? '#ccfbf1' : '#f3f4f6',
+                                paddingHorizontal: 6,
+                                paddingVertical: 2,
+                                borderRadius: 8,
+                                borderWidth: 0.5,
+                                borderColor: isOnline ? '#99f6e4' : '#e5e7eb',
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                gap: 2,
+                                zIndex: 10
+                            }}>
+                                <Ionicons name={isOnline ? "sync-outline" : "wifi-outline"} size={10} color={isOnline ? "#0f766e" : "#4b5563"} />
+                                <Text style={{ fontSize: 9, fontWeight: '900', color: isOnline ? "#0f766e" : "#4b5563", textTransform: 'uppercase' }}>
+                                    {isOnline ? "🟢 Online Sync" : "🟡 Offline Mode"}
+                                </Text>
+                            </View>
+                            <View style={[styles.toolIcon, { backgroundColor: '#dcfce7', marginTop: 8 }]}>
+                                <Layers size={24} color="#16a34a" strokeWidth={2.5} />
+                            </View>
+                            <Text style={[styles.toolText, { color: colors.text, fontSize: 15 * scale }]}>
+                                {language === 'twi' ? 'Kasa Nhyehyɛeɛ' : language === 'ga' ? 'Wiemɔ Saji Kpeemɔ' : 'Phrase Quest'}
+                            </Text>
+                            <Text style={[styles.toolSubText, { fontSize: 12 * scale, color: colors.subText }]}>
+                                {language === 'twi' ? 'Siesie nsɛmfua nteaseɛ' : language === 'ga' ? 'To gbɛjianɔ wiemɔi' : 'Assemble scenarios'}
+                            </Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+
                 {/* Patient Tools */}
                 <View style={styles.section}>
                     <Text style={[styles.sectionTitle, { color: colors.text, fontSize: 18 * scale }]}>{tr('myTools')}</Text>
@@ -290,7 +472,27 @@ export const PatientDashboard: React.FC<PatientDashboardProps> = ({
                             activeOpacity={0.8}
                             style={[styles.toolCard, getHighlightStyle('phraseboard'), { backgroundColor: colors.card, borderColor: colors.border }]}
                         >
-                            <View style={[styles.toolIcon, { backgroundColor: colors.accent + '15' }]}>
+                            <View style={{
+                                position: 'absolute',
+                                top: 8,
+                                right: 8,
+                                backgroundColor: isOnline ? '#ccfbf1' : '#f3f4f6',
+                                paddingHorizontal: 6,
+                                paddingVertical: 2,
+                                borderRadius: 8,
+                                borderWidth: 0.5,
+                                borderColor: isOnline ? '#99f6e4' : '#e5e7eb',
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                gap: 2,
+                                zIndex: 10
+                            }}>
+                                <Ionicons name={isOnline ? "sync-outline" : "wifi-outline"} size={10} color={isOnline ? "#0f766e" : "#4b5563"} />
+                                <Text style={{ fontSize: 9, fontWeight: '900', color: isOnline ? "#0f766e" : "#4b5563", textTransform: 'uppercase' }}>
+                                    {isOnline ? "🟢 Online Sync" : "🟡 Offline Mode"}
+                                </Text>
+                            </View>
+                            <View style={[styles.toolIcon, { backgroundColor: colors.accent + '15', marginTop: 8 }]}>
                                 <Grid size={24} color={colors.accent} strokeWidth={2.5} />
                             </View>
                             <Text style={[styles.toolText, { color: colors.text, fontSize: 15 * scale }]}>{tr('phraseBoard')}</Text>
@@ -308,7 +510,27 @@ export const PatientDashboard: React.FC<PatientDashboardProps> = ({
                             activeOpacity={0.8}
                             style={[styles.toolCard, getHighlightStyle('symbol-speak'), { backgroundColor: colors.card, borderColor: colors.border }]}
                         >
-                            <View style={[styles.toolIcon, { backgroundColor: colors.primary + '15' }]}>
+                            <View style={{
+                                position: 'absolute',
+                                top: 8,
+                                right: 8,
+                                backgroundColor: isOnline ? '#ccfbf1' : '#f3f4f6',
+                                paddingHorizontal: 6,
+                                paddingVertical: 2,
+                                borderRadius: 8,
+                                borderWidth: 0.5,
+                                borderColor: isOnline ? '#99f6e4' : '#e5e7eb',
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                gap: 2,
+                                zIndex: 10
+                            }}>
+                                <Ionicons name={isOnline ? "sync-outline" : "wifi-outline"} size={10} color={isOnline ? "#0f766e" : "#4b5563"} />
+                                <Text style={{ fontSize: 9, fontWeight: '900', color: isOnline ? "#0f766e" : "#4b5563", textTransform: 'uppercase' }}>
+                                    {isOnline ? "🟢 Online Sync" : "🟡 Offline Mode"}
+                                </Text>
+                            </View>
+                            <View style={[styles.toolIcon, { backgroundColor: colors.primary + '15', marginTop: 8 }]}>
                                 <Wand2 size={24} color={colors.primary} strokeWidth={2.5} />
                             </View>
                             <Text style={[styles.toolText, { color: colors.text, fontSize: 15 * scale }]}>{tr('symbolSpeak' as any) || 'Symbol Speak'}</Text>
@@ -324,6 +546,27 @@ export const PatientDashboard: React.FC<PatientDashboardProps> = ({
                             activeOpacity={0.8}
                             style={[styles.toolCard, getHighlightStyle('journal'), { backgroundColor: colors.card, borderColor: colors.border }]}
                         >
+                            {streakInfo && streakInfo.currentStreak > 0 && (
+                                <View style={{
+                                    position: 'absolute',
+                                    top: 10,
+                                    right: 10,
+                                    flexDirection: 'row',
+                                    alignItems: 'center',
+                                    backgroundColor: '#fff7ed',
+                                    paddingHorizontal: 6,
+                                    paddingVertical: 2,
+                                    borderRadius: 10,
+                                    borderWidth: 1,
+                                    borderColor: '#ffedd5',
+                                    gap: 2
+                                }}>
+                                    <Ionicons name="flame" size={12} color="#f97316" />
+                                    <Text style={{ fontSize: 10, fontWeight: '700', color: '#ea580c' }}>
+                                        {streakInfo.currentStreak}d
+                                    </Text>
+                                </View>
+                            )}
                             <View style={[styles.toolIcon, { backgroundColor: colors.primary + '15' }]}>
                                 <BookOpen size={24} color={colors.primary} strokeWidth={2.5} />
                             </View>
@@ -383,20 +626,25 @@ export const PatientDashboard: React.FC<PatientDashboardProps> = ({
 
 
 
-                        {/* Exercise Trainer (Hospital only) */}
-                        {patientType === 'hospital' && (
-                            <TouchableOpacity
-                                onPress={() => router.push('/exercise-trainer')}
-                                activeOpacity={0.8}
-                                style={styles.toolCard}
-                            >
-                                <View style={[styles.toolIcon, { backgroundColor: '#ecfdf5' }]}>
-                                    <Dumbbell size={24} color="#10b981" strokeWidth={2} />
-                                </View>
-                                <Text style={styles.toolText}>{tr('exercises')}</Text>
-                                <Text style={styles.toolSubText}>{tr('guidedTrainer')}</Text>
-                            </TouchableOpacity>
-                        )}
+                        {/* Exercise Trainer (Available to all patients) */}
+                        <TouchableOpacity
+                            onPress={() => {
+                                haptics.selection();
+                                router.push('/exercise-trainer');
+                            }}
+                            activeOpacity={0.8}
+                            style={[
+                                styles.toolCard,
+                                getHighlightStyle('exercise-trainer'),
+                                { backgroundColor: colors.card, borderColor: colors.border }
+                            ]}
+                        >
+                            <View style={[styles.toolIcon, { backgroundColor: '#ecfdf5' }]}>
+                                <Dumbbell size={24} color="#10b981" strokeWidth={2} />
+                            </View>
+                            <Text style={[styles.toolText, { color: colors.text, fontSize: 15 * scale }]}>{tr('exercises')}</Text>
+                            <Text style={[styles.toolSubText, { fontSize: 12 * scale, color: colors.subText }]}>{tr('guidedTrainer')}</Text>
+                        </TouchableOpacity>
 
 
 

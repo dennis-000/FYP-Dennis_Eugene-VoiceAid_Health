@@ -4,7 +4,7 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { usePathname, useRouter } from "next/navigation";
-import { Building2, HeartPulse, LayoutDashboard, LogOut, Users, UserCog } from "lucide-react";
+import { Building2, HeartPulse, LayoutDashboard, LogOut, Users, UserCog, TrendingUp, BookOpen, Cpu, Shield } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useEffect, useState } from "react";
 
@@ -15,6 +15,10 @@ const NAV_ITEMS = [
     { href: '/organizations', label: 'Organizations', icon: Building2 },
     { href: '/therapists', label: 'Therapists', icon: UserCog },
     { href: '/patients', label: 'Patients', icon: Users },
+    { href: '/clinical-progress', label: 'Clinical Progress', icon: TrendingUp },
+    { href: '/content-library', label: 'Content Library', icon: BookOpen },
+    { href: '/ai-diagnostics', label: 'AI Diagnostics', icon: Cpu },
+    { href: '/compliance', label: 'Compliance & Audits', icon: Shield },
 ];
 
 function Sidebar() {
@@ -106,7 +110,8 @@ export default function RootLayout({
             <head>
                 <title>VoiceAid Health — Admin Dashboard</title>
                 <meta name="description" content="Clinical management dashboard for VoiceAid Health — monitor patients, manage therapists, and respond to emergency alerts in real time." />
-                <link rel="icon" href="/favicon.ico" type="image/x-icon" />
+                <link rel="icon" href="/favicon.png" type="image/png" />
+                <link rel="apple-touch-icon" href="/favicon.png" />
                 <meta name="theme-color" content="#1e40af" />
             </head>
             <body className={inter.className}>

@@ -1,4 +1,4 @@
-import { Audio } from 'expo-av';
+import { AudioRecorder } from 'expo-audio';
 import { Check, Edit3, Mic, Sparkles, Volume2 } from 'lucide-react-native';
 import React, { useState } from 'react';
 import { ActivityIndicator, Text, TextInput, TouchableOpacity, View } from 'react-native';
@@ -14,7 +14,7 @@ import ConfidenceMeter from './ConfidenceMeter';
 import LiveWaveform from './LiveWaveform';
 
 interface TranscriptionDisplayProps {
-    recording: Audio.Recording | null;
+    recording: AudioRecorder | null;
     isProcessing: boolean;
     finalResult: ASRResponse | null;
     intentData: IntentResponse | null;
