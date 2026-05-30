@@ -1,4 +1,4 @@
-import * as FileSystem from 'expo-file-system/legacy';
+import * as FileSystem from 'expo-file-system/src/legacy';
 import { supabase } from '../lib/supabase';
 
 export interface VoiceJournal {

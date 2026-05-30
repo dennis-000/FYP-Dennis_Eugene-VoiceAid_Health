@@ -68,6 +68,7 @@ export default function TherapyWordGameScreen() {
     const [spokenText, setSpokenText] = useState('');
     const [isListening, setIsListening] = useState(false);
     const [isProcessing, setIsProcessing] = useState(false);
+    const [meteringLevels, setMeteringLevels] = useState<number[]>([]);
 
     // Recording hook
     const audioRecorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);

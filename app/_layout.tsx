@@ -11,11 +11,11 @@ import { RoleProvider, UserRole } from '../contexts/RoleContext';
 // Web reconciliation patch to prevent 'removeChild' crash in React 19 / Expo Web development
 if (Platform.OS === 'web' && typeof window !== 'undefined') {
   const originalRemoveChild = Node.prototype.removeChild;
-  Node.prototype.removeChild = function (child) {
+  Node.prototype.removeChild = function <T extends Node>(child: T): T {
     if (child && child.parentNode !== this) {
       return child;
     }
-    return originalRemoveChild.call(this, child);
+    return originalRemoveChild.call(this, child) as T;
   };
 }
 

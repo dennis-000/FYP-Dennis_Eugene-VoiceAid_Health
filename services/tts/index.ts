@@ -1,5 +1,5 @@
 import { createAudioPlayer, setAudioModeAsync, AudioPlayer } from 'expo-audio';
-import * as FileSystem from 'expo-file-system/legacy';
+import * as FileSystem from 'expo-file-system/src/legacy';
 import * as Speech from 'expo-speech';
 import { ENDPOINTS } from '../../constants/config';
 import { DEFAULT_OPTIONS, SupportedTTSLanguage } from './config';
