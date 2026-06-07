@@ -35,8 +35,13 @@ function Sidebar({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) 
     if (pathname === '/login') return null;
 
     const handleLogout = async () => {
-        await supabase.auth.signOut();
+        try {
+            await supabase.auth.signOut();
+        } catch (error) {
+            console.error('Logout error during Supabase signOut:', error);
+        }
         router.push('/login');
+        onClose();
     };
 
     return (
