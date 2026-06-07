@@ -234,24 +234,24 @@ export default function ContentLibraryPage() {
             </div>
 
             {/* Navigation Tabs */}
-            <div className="flex border-b border-gray-100 mb-8 bg-white p-1 rounded-xl shadow-sm border border-gray-100/50">
+            <div className="flex overflow-x-auto whitespace-nowrap scrollbar-none md:flex-wrap border-b border-gray-100 mb-8 bg-white p-1 rounded-xl shadow-sm border border-gray-100/50">
                 <button
                     onClick={() => setActiveTab('exercises')}
-                    className={`flex items-center gap-2 px-6 py-3 text-sm font-bold rounded-lg transition-colors ${activeTab === 'exercises' ? 'bg-[#CC0000]/10 text-[#CC0000]' : 'text-gray-500 hover:text-gray-900'}`}
+                    className={`flex items-center gap-2 px-6 py-3 text-sm font-bold rounded-lg transition-colors flex-shrink-0 ${activeTab === 'exercises' ? 'bg-[#CC0000]/10 text-[#CC0000]' : 'text-gray-500 hover:text-gray-900'}`}
                 >
                     <BookOpen size={16} />
                     Clinical Exercises
                 </button>
                 <button
                     onClick={() => setActiveTab('symbols')}
-                    className={`flex items-center gap-2 px-6 py-3 text-sm font-bold rounded-lg transition-colors ${activeTab === 'symbols' ? 'bg-[#CC0000]/10 text-[#CC0000]' : 'text-gray-500 hover:text-gray-900'}`}
+                    className={`flex items-center gap-2 px-6 py-3 text-sm font-bold rounded-lg transition-colors flex-shrink-0 ${activeTab === 'symbols' ? 'bg-[#CC0000]/10 text-[#CC0000]' : 'text-gray-500 hover:text-gray-900'}`}
                 >
                     <Grid size={16} />
                     Symbol Speak Boards (AAC)
                 </button>
                 <button
                     onClick={() => setActiveTab('synthesis')}
-                    className={`flex items-center gap-2 px-6 py-3 text-sm font-bold rounded-lg transition-colors ${activeTab === 'synthesis' ? 'bg-[#CC0000]/10 text-[#CC0000]' : 'text-gray-500 hover:text-gray-900'}`}
+                    className={`flex items-center gap-2 px-6 py-3 text-sm font-bold rounded-lg transition-colors flex-shrink-0 ${activeTab === 'synthesis' ? 'bg-[#CC0000]/10 text-[#CC0000]' : 'text-gray-500 hover:text-gray-900'}`}
                 >
                     <Languages size={16} />
                     Speech Synthesis Seeds
@@ -460,7 +460,7 @@ export default function ContentLibraryPage() {
             {/* ADD EXERCISE GOAL DIALOG/MODAL */}
             {isAddModalOpen && (
                 <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                    <div className="bg-white rounded-2xl border border-gray-100 p-6 w-full max-w-md animate-fade-in shadow-2xl relative">
+                    <div className="bg-white rounded-2xl border border-gray-100 p-6 w-full max-w-md animate-fade-in shadow-2xl relative max-h-[95vh] sm:max-h-[90vh] overflow-y-auto">
                         <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-[#FFD700] via-[#CC0000] to-[#008000]" />
                         <h2 className="text-lg font-bold text-gray-900 mb-4 mt-2">Create Standard Exercise Goal</h2>
                         

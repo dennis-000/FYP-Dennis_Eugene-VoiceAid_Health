@@ -300,7 +300,7 @@ export default function HomePage() {
                             <div key={day + i} className="flex flex-col items-center gap-2 group cursor-pointer w-full mx-1">
                                 <div className="w-full relative flex justify-center h-full items-end">
                                     <div 
-                                        className="w-12 bg-[#FFD700]/20 rounded-t-lg relative overflow-hidden transition-all duration-500 group-hover:bg-[#FFD700]/40"
+                                        className="w-8 sm:w-12 bg-[#FFD700]/20 rounded-t-lg relative overflow-hidden transition-all duration-500 group-hover:bg-[#FFD700]/40"
                                         style={{ height: `${heightPercentage}%` }}
                                     >
                                         <div className="absolute bottom-0 w-full bg-gradient-to-t from-[#FFD700] to-[#CC0000]" style={{ height: '60%' }} />

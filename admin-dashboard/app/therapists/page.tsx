@@ -126,60 +126,62 @@ export default function TherapistsPage() {
             ) : (
                 <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden animate-fade-in relative" style={{ boxShadow: 'var(--card-shadow)', animationDelay: '240ms' }}>
                     <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-[#FFD700] via-[#CC0000] to-[#008000]" />
-                    <table className="min-w-full mt-1">
-                        <thead>
-                            <tr className="border-b border-gray-100">
-                                <th className="px-6 py-4 text-left text-[11px] font-bold text-gray-400 uppercase tracking-wider">Pathologist</th>
-                                <th className="px-6 py-4 text-left text-[11px] font-bold text-gray-400 uppercase tracking-wider">Therapy Center</th>
-                                <th className="px-6 py-4 text-left text-[11px] font-bold text-gray-400 uppercase tracking-wider">Specialization</th>
-                                <th className="px-6 py-4 text-left text-[11px] font-bold text-gray-400 uppercase tracking-wider">Patients</th>
-                                <th className="px-6 py-4 text-left text-[11px] font-bold text-gray-400 uppercase tracking-wider">Joined</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-50">
-                            {filtered.map(t => (
-                                <tr key={t.id} className="hover:bg-[#008000]/5 transition-colors">
-                                    <td className="px-6 py-4">
-                                        <div className="flex items-center gap-3">
-                                            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#008000] to-[#006600] flex items-center justify-center text-white text-sm font-bold shadow-sm">
-                                                {(t.full_name || 'U').charAt(0).toUpperCase()}
-                                            </div>
-                                            <div>
-                                                <p className="text-sm font-medium text-gray-900">{t.full_name}</p>
-                                                <p className="text-xs text-gray-500">{t.email}</p>
-                                            </div>
-                                        </div>
-                                    </td>
-                                    <td className="px-6 py-4">
-                                        <div className="flex items-center gap-2 text-sm text-gray-700">
-                                            <Building2 size={14} className="text-[#FFD700]" />
-                                            {t.organization || <span className="text-gray-400">—</span>}
-                                        </div>
-                                        {t.organization_code && (
-                                            <code className="text-[10px] text-[#111111] bg-[#FFD700]/20 px-1.5 py-0.5 rounded font-mono mt-1 inline-block border border-[#FFD700]/30">
-                                                {t.organization_code}
-                                            </code>
-                                        )}
-                                    </td>
-                                    <td className="px-6 py-4 text-sm text-gray-700">
-                                        {t.specialization || <span className="text-gray-400">—</span>}
-                                    </td>
-                                    <td className="px-6 py-4">
-                                        <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-semibold ${
-                                            ((t as any).patientCount || 0) > 0
-                                                ? 'bg-blue-50 text-blue-700'
-                                                : 'bg-gray-50 text-gray-500'
-                                         }`}>
-                                            {(t as any).patientCount || 0}
-                                        </span>
-                                    </td>
-                                    <td className="px-6 py-4 text-sm text-gray-500">
-                                        {new Date(t.created_at).toLocaleDateString()}
-                                    </td>
+                    <div className="overflow-x-auto w-full">
+                        <table className="min-w-full mt-1">
+                            <thead>
+                                <tr className="border-b border-gray-100">
+                                    <th className="px-6 py-4 text-left text-[11px] font-bold text-gray-400 uppercase tracking-wider">Pathologist</th>
+                                    <th className="px-6 py-4 text-left text-[11px] font-bold text-gray-400 uppercase tracking-wider">Therapy Center</th>
+                                    <th className="px-6 py-4 text-left text-[11px] font-bold text-gray-400 uppercase tracking-wider">Specialization</th>
+                                    <th className="px-6 py-4 text-left text-[11px] font-bold text-gray-400 uppercase tracking-wider">Patients</th>
+                                    <th className="px-6 py-4 text-left text-[11px] font-bold text-gray-400 uppercase tracking-wider">Joined</th>
                                 </tr>
-                            ))}
-                        </tbody>
-                    </table>
+                            </thead>
+                            <tbody className="divide-y divide-gray-50">
+                                {filtered.map(t => (
+                                    <tr key={t.id} className="hover:bg-[#008000]/5 transition-colors">
+                                        <td className="px-6 py-4">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#008000] to-[#006600] flex items-center justify-center text-white text-sm font-bold shadow-sm">
+                                                    {(t.full_name || 'U').charAt(0).toUpperCase()}
+                                                </div>
+                                                <div>
+                                                    <p className="text-sm font-medium text-gray-900">{t.full_name}</p>
+                                                    <p className="text-xs text-gray-500">{t.email}</p>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <div className="flex items-center gap-2 text-sm text-gray-700">
+                                                <Building2 size={14} className="text-[#FFD700]" />
+                                                {t.organization || <span className="text-gray-400">—</span>}
+                                            </div>
+                                            {t.organization_code && (
+                                                <code className="text-[10px] text-[#111111] bg-[#FFD700]/20 px-1.5 py-0.5 rounded font-mono mt-1 inline-block border border-[#FFD700]/30">
+                                                    {t.organization_code}
+                                                </code>
+                                            )}
+                                        </td>
+                                        <td className="px-6 py-4 text-sm text-gray-700">
+                                            {t.specialization || <span className="text-gray-400">—</span>}
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-semibold ${
+                                                ((t as any).patientCount || 0) > 0
+                                                    ? 'bg-blue-50 text-blue-700'
+                                                    : 'bg-gray-50 text-gray-500'
+                                             }`}>
+                                                {(t as any).patientCount || 0}
+                                            </span>
+                                        </td>
+                                        <td className="px-6 py-4 text-sm text-gray-500">
+                                            {new Date(t.created_at).toLocaleDateString()}
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             )}
         </div>

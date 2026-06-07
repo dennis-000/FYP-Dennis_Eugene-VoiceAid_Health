@@ -162,7 +162,7 @@ export default function AIDiagnosticsPage() {
     return (
         <div className="p-8 max-w-6xl mx-auto animate-fade-in">
             {/* Header */}
-            <div className="mb-8 flex items-center justify-between">
+            <div className="mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
                     <div className="flex items-center gap-2 mb-1">
                         <div className="w-2.5 h-2.5 rounded-full bg-[#008000] animate-ping" />
@@ -173,7 +173,7 @@ export default function AIDiagnosticsPage() {
                 </div>
                 <button
                     onClick={triggerSystemAudit}
-                    className="flex items-center gap-2 px-4 py-2 border border-gray-200 rounded-xl hover:bg-gray-50 text-sm font-semibold transition-all bg-white shadow-sm"
+                    className="flex items-center justify-center gap-2 px-4 py-2 border border-gray-200 rounded-xl hover:bg-gray-50 text-sm font-semibold transition-all bg-white shadow-sm w-full sm:w-auto"
                 >
                     {isWsConnecting ? (
                         <Loader2 className="w-4 h-4 text-gray-500 animate-spin" />

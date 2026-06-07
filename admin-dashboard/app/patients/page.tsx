@@ -190,75 +190,79 @@ export default function PatientsPage() {
             ) : (
                 <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden animate-fade-in relative" style={{ boxShadow: 'var(--card-shadow)', animationDelay: '240ms' }}>
                     <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-[#FFD700] via-[#CC0000] to-[#008000]" />
-                    <table className="min-w-full mt-1">
-                        <thead>
-                            <tr className="border-b border-gray-100">
-                                <th className="px-6 py-4 text-left text-[11px] font-bold text-gray-400 uppercase tracking-wider">Patient</th>
-                                <th className="px-6 py-4 text-left text-[11px] font-bold text-gray-400 uppercase tracking-wider">Type</th>
-                                <th className="px-6 py-4 text-left text-[11px] font-bold text-gray-400 uppercase tracking-wider">Hospital ID</th>
-                                <th className="px-6 py-4 text-left text-[11px] font-bold text-gray-400 uppercase tracking-wider">Therapist</th>
-                                <th className="px-6 py-4 text-left text-[11px] font-bold text-gray-400 uppercase tracking-wider">Created</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-50">
-                            {filtered.map(p => (
-                                <tr key={p.id} className="hover:bg-[#CC0000]/5 transition-colors">
-                                    <td className="px-6 py-4">
-                                            <div className="relative">
-                                                <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-white text-sm font-bold shadow-sm ${
-                                                    p.patient_type === 'hospital'
-                                                        ? 'bg-gradient-to-br from-[#008000] to-[#006600]'
-                                                        : 'bg-gradient-to-br from-[#FFD700] to-[#E6B800] text-black'
-                                                }`}>
-                                                    {(p.full_name || 'G').charAt(0).toUpperCase()}
-                                                </div>
-                                                {activeAlerts.has(p.id) && (
-                                                    <div className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full border-2 border-white animate-pulse" />
-                                                )}
-                                            </div>
-                                            <div>
-                                                <div className="flex items-center gap-2">
-                                                    <p className="text-sm font-medium text-gray-900">{p.full_name || 'Guest User'}</p>
+                    <div className="overflow-x-auto w-full">
+                        <table className="min-w-full mt-1">
+                            <thead>
+                                <tr className="border-b border-gray-100">
+                                    <th className="px-6 py-4 text-left text-[11px] font-bold text-gray-400 uppercase tracking-wider">Patient</th>
+                                    <th className="px-6 py-4 text-left text-[11px] font-bold text-gray-400 uppercase tracking-wider">Type</th>
+                                    <th className="px-6 py-4 text-left text-[11px] font-bold text-gray-400 uppercase tracking-wider">Hospital ID</th>
+                                    <th className="px-6 py-4 text-left text-[11px] font-bold text-gray-400 uppercase tracking-wider">Therapist</th>
+                                    <th className="px-6 py-4 text-left text-[11px] font-bold text-gray-400 uppercase tracking-wider">Created</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-50">
+                                {filtered.map(p => (
+                                    <tr key={p.id} className="hover:bg-[#CC0000]/5 transition-colors">
+                                        <td className="px-6 py-4">
+                                            <div className="flex items-center gap-3">
+                                                <div className="relative">
+                                                    <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-white text-sm font-bold shadow-sm ${
+                                                        p.patient_type === 'hospital'
+                                                            ? 'bg-gradient-to-br from-[#008000] to-[#006600]'
+                                                            : 'bg-gradient-to-br from-[#FFD700] to-[#E6B800] text-black'
+                                                    }`}>
+                                                        {(p.full_name || 'G').charAt(0).toUpperCase()}
+                                                    </div>
                                                     {activeAlerts.has(p.id) && (
-                                                        <span className="bg-red-500 text-white text-[8px] font-black px-1 rounded animate-pulse">CLINICAL ALERT</span>
+                                                        <div className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full border-2 border-white animate-pulse" />
                                                     )}
                                                 </div>
-                                                <p className="text-[10px] text-gray-400 font-mono">{p.id.substring(0, 8)}...</p>
+                                                <div>
+                                                    <div className="flex items-center gap-2">
+                                                        <p className="text-sm font-medium text-gray-900">{p.full_name || 'Guest User'}</p>
+                                                        {activeAlerts.has(p.id) && (
+                                                            <span className="bg-red-500 text-white text-[8px] font-black px-1 rounded animate-pulse">CLINICAL ALERT</span>
+                                                        )}
+                                                    </div>
+                                                    <p className="text-[10px] text-gray-400 font-mono">{p.id.substring(0, 8)}...</p>
+                                                </div>
                                             </div>
-                                    </td>
-                                    <td className="px-6 py-4">
-                                        <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold ${
-                                            p.patient_type === 'hospital'
-                                                ? 'bg-[#008000]/10 text-[#008000]'
-                                                : 'bg-[#FFD700]/20 text-[#111111]'
-                                        }`}>
-                                            {p.patient_type === 'hospital' ? '🏥 Hospital' : '👤 Guest'}
-                                        </span>
-                                    </td>
-                                    <td className="px-6 py-4 text-sm text-gray-700">
-                                        {p.hospital_id ? (
-                                            <code className="text-xs bg-gray-50 px-2 py-0.5 rounded font-mono">{p.hospital_id}</code>
-                                        ) : (
-                                            <span className="text-gray-400">—</span>
-                                        )}
-                                    </td>
-                                    <td className="px-6 py-4">
-                                        {p.therapist_id ? (
-                                            <span className="inline-flex items-center gap-1.5 text-sm text-blue-600 font-medium">
-                                                <div className="w-1.5 h-1.5 rounded-full bg-blue-500" />
-                                                Assigned
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold ${
+                                                p.patient_type === 'hospital'
+                                                    ? 'bg-[#008000]/10 text-[#008000]'
+                                                    : 'bg-[#FFD700]/20 text-[#111111]'
+                                            }`}>
+                                                {p.patient_type === 'hospital' ? '🏥 Hospital' : '👤 Guest'}
                                             </span>
-                                        ) : (
-                                            <span className="text-sm text-gray-400">Unassigned</span>
-                                        )}
-                                    </td>
-                                    <td className="px-6 py-4 text-sm text-gray-500">
-                                        {new Date(p.created_at).toLocaleDateString()}
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
+                                        </td>
+                                        <td className="px-6 py-4 text-sm text-gray-700">
+                                            {p.hospital_id ? (
+                                                <code className="text-xs bg-gray-50 px-2 py-0.5 rounded font-mono">{p.hospital_id}</code>
+                                            ) : (
+                                                <span className="text-gray-400">—</span>
+                                            )}
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            {p.therapist_id ? (
+                                                <span className="inline-flex items-center gap-1.5 text-sm text-blue-600 font-medium">
+                                                    <div className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                                                    Assigned
+                                                </span>
+                                            ) : (
+                                                <span className="text-sm text-gray-400">Unassigned</span>
+                                            )}
+                                        </td>
+                                        <td className="px-6 py-4 text-sm text-gray-500">
+                                            {new Date(p.created_at).toLocaleDateString()}
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             )}
         </div>

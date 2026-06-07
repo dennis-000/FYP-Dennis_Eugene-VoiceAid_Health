@@ -53,14 +53,14 @@ export default function OrganizationsPage() {
     return (
         <div className="p-8 max-w-6xl mx-auto">
             {/* Header */}
-            <div className="flex items-center justify-between mb-8 animate-fade-in">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8 animate-fade-in">
                 <div>
                     <h1 className="text-3xl font-bold text-[#111111] tracking-tight">Therapy Centers</h1>
                     <p className="text-gray-500 mt-1">{organizations.length} registered {organizations.length === 1 ? 'center' : 'centers'}</p>
                 </div>
                 <button
                     onClick={() => setShowCreateModal(true)}
-                    className="flex items-center gap-2 bg-gradient-to-r from-[#FFD700] to-[#E6B800] text-black px-5 py-2.5 rounded-xl hover:from-[#E6B800] hover:to-[#CC9900] font-bold text-sm shadow-lg shadow-[#FFD700]/25 transition-all"
+                    className="flex items-center justify-center gap-2 bg-gradient-to-r from-[#FFD700] to-[#E6B800] text-black px-5 py-2.5 rounded-xl hover:from-[#E6B800] hover:to-[#CC9900] font-bold text-sm shadow-lg shadow-[#FFD700]/25 transition-all w-full sm:w-auto"
                 >
                     <Plus size={18} />
                     New Center
@@ -216,7 +216,7 @@ function CreateModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: (
 
     return (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in">
-            <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl max-h-[95vh] sm:max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
                 <div className="flex items-center justify-between mb-5">
                     <h2 className="text-xl font-bold text-gray-900">New Organization</h2>
                     <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-xl transition-colors">
