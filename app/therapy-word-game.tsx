@@ -2,9 +2,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { ArrowLeft, Mic, Square, Volume2 } from 'lucide-react-native';
 import React, { useContext, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useAudioRecorder, useAudioRecorderState, RecordingPresets, AudioModule } from 'expo-audio';
+import { RecordingPresets, AudioModule } from 'expo-audio';
+import type { AudioRecorder } from 'expo-audio';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AppContext } from './_layout';
 import { useT } from '../utils/i18n';
@@ -70,16 +71,109 @@ export default function TherapyWordGameScreen() {
     const [isProcessing, setIsProcessing] = useState(false);
     const [meteringLevels, setMeteringLevels] = useState<number[]>([]);
 
-    // Recording hook
-    const audioRecorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
-    const recorderState = useAudioRecorderState(audioRecorder, 100);
+    const [audioRecorder, setAudioRecorder] = useState<AudioRecorder | null>(null);
+    const [recorderState, setRecorderState] = useState<{
+        canRecord: boolean;
+        isRecording: boolean;
+        durationMillis: number;
+        metering?: number;
+    }>({
+        canRecord: false,
+        isRecording: false,
+        durationMillis: 0,
+        metering: -160,
+    });
+
+    // Initialize AudioRecorder and handle cleanup on unmount
+    useEffect(() => {
+        let activeRecorder: AudioRecorder | null = null;
+        try {
+            const commonOptions = {
+                extension: '.m4a',
+                sampleRate: 44100,
+                numberOfChannels: 2,
+                bitRate: 128000,
+                isMeteringEnabled: true,
+            };
+            const platformOptions = Platform.OS === 'ios' ? {
+                ...commonOptions,
+                outputFormat: 'aac ', // IOSOutputFormat.MPEG4AAC
+                audioQuality: 127, // AudioQuality.MAX
+                linearPCMBitDepth: 16,
+                linearPCMIsBigEndian: false,
+                linearPCMIsFloat: false,
+            } : Platform.OS === 'android' ? {
+                ...commonOptions,
+                outputFormat: 'mpeg4',
+                audioEncoder: 'aac',
+            } : {
+                ...commonOptions,
+                mimeType: 'audio/webm',
+                bitsPerSecond: 128000,
+            };
+            
+            activeRecorder = new AudioModule.AudioRecorder(platformOptions as any);
+            setAudioRecorder(activeRecorder);
+            
+            try {
+                setRecorderState(activeRecorder.getStatus());
+            } catch (err) {
+                console.warn('[WordGame] Failed to get initial status:', err);
+            }
+        } catch (e) {
+            console.error('[WordGame] Failed to create AudioRecorder:', e);
+        }
+
+        return () => {
+            if (activeRecorder) {
+                try {
+                    if (activeRecorder.isRecording) {
+                        activeRecorder.stop().catch(() => {});
+                    }
+                } catch (e) {}
+                try {
+                    activeRecorder.release();
+                } catch (e) {
+                    console.warn('[WordGame] Failed to release recorder:', e);
+                }
+            }
+        };
+    }, []);
+
+    // Poll status updates safely
+    useEffect(() => {
+        if (!audioRecorder) return;
+
+        const intervalId = setInterval(() => {
+            try {
+                const newState = audioRecorder.getStatus();
+                setRecorderState((prevState) => {
+                    const meteringChanged = (prevState.metering === undefined) !== (newState.metering === undefined) ||
+                        (prevState.metering !== undefined &&
+                            newState.metering !== undefined &&
+                            Math.abs(prevState.metering - newState.metering) > 0.1);
+                    if (prevState.canRecord !== newState.canRecord ||
+                        prevState.isRecording !== newState.isRecording ||
+                        Math.abs(prevState.durationMillis - newState.durationMillis) > 50 ||
+                        meteringChanged) {
+                        return newState;
+                    }
+                    return prevState;
+                });
+            } catch (err) {
+                clearInterval(intervalId);
+            }
+        }, 100);
+
+        return () => clearInterval(intervalId);
+    }, [audioRecorder]);
 
     // Metering levels sync
     useEffect(() => {
-        if (audioRecorder.isRecording && typeof recorderState.metering === 'number') {
+        if (recorderState.isRecording && typeof recorderState.metering === 'number') {
             setMeteringLevels(prev => [...prev, recorderState.metering || -160].slice(-20));
         }
-    }, [recorderState.metering, audioRecorder.isRecording]);
+    }, [recorderState.metering, recorderState.isRecording]);
 
     const [timer, setTimer] = useState(0);
     const timerInterval = useRef<NodeJS.Timeout | null>(null);
@@ -153,11 +247,6 @@ export default function TherapyWordGameScreen() {
             }
         };
         loadScore();
-        return () => {
-            if (audioRecorder.isRecording) {
-                audioRecorder.stop().catch(() => {});
-            }
-        };
     }, []);
 
     const getTargetText = () => {
@@ -178,6 +267,7 @@ export default function TherapyWordGameScreen() {
     };
 
     const startRecording = async () => {
+        if (!audioRecorder) return;
         try {
             const { status } = await AudioModule.requestRecordingPermissionsAsync();
             if (status !== 'granted') {
@@ -244,7 +334,7 @@ export default function TherapyWordGameScreen() {
     };
 
     const stopRecording = async () => {
-        if (!audioRecorder.isRecording) return;
+        if (!audioRecorder || !audioRecorder.isRecording) return;
 
         setIsListening(false);
         setIsProcessing(true);

@@ -1,4 +1,5 @@
-import { useAudioRecorder, useAudioRecorderState, RecordingPresets, AudioModule } from 'expo-audio';
+import { RecordingPresets, AudioModule } from 'expo-audio';
+import type { AudioRecorder } from 'expo-audio';
 import { useRouter } from 'expo-router';
 import { ArrowLeft, Mic, Share2, Square, Volume2 } from 'lucide-react-native';
 import React, { useCallback, useContext, useEffect, useRef, useState } from 'react';
@@ -6,6 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   Alert,
   Animated,
+  Platform,
   ScrollView,
   Share,
   StyleSheet,
@@ -73,21 +75,119 @@ export default function TranscriptionScreen() {
   const scrollViewRef = useRef<ScrollView>(null);
 
   // State
-  const audioRecorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
-  const recorderState = useAudioRecorderState(audioRecorder, 100);
+  const [recorder, setRecorder] = useState<AudioRecorder | null>(null);
+  const [recorderState, setRecorderState] = useState<{
+    canRecord: boolean;
+    isRecording: boolean;
+    durationMillis: number;
+    metering?: number;
+  }>({
+    canRecord: false,
+    isRecording: false,
+    durationMillis: 0,
+    metering: -160,
+  });
 
-  const recording = audioRecorder.isRecording ? audioRecorder : null;
+  const isRecording = recorderState.isRecording;
   const chunkIntervalRef = useRef<any>(null);
+
+  // Safely initialize and manage the life cycle of the AudioRecorder
+  useEffect(() => {
+    let activeRecorder: AudioRecorder | null = null;
+    try {
+      const commonOptions = {
+        extension: '.m4a',
+        sampleRate: 44100,
+        numberOfChannels: 2,
+        bitRate: 128000,
+        isMeteringEnabled: true,
+      };
+      const platformOptions = Platform.OS === 'ios' ? {
+        ...commonOptions,
+        outputFormat: 'aac ', // IOSOutputFormat.MPEG4AAC
+        audioQuality: 127, // AudioQuality.MAX
+        linearPCMBitDepth: 16,
+        linearPCMIsBigEndian: false,
+        linearPCMIsFloat: false,
+      } : Platform.OS === 'android' ? {
+        ...commonOptions,
+        outputFormat: 'mpeg4',
+        audioEncoder: 'aac',
+      } : {
+        ...commonOptions,
+        mimeType: 'audio/webm',
+        bitsPerSecond: 128000,
+      };
+      
+      activeRecorder = new AudioModule.AudioRecorder(platformOptions as any);
+      setRecorder(activeRecorder);
+      
+      try {
+        setRecorderState(activeRecorder.getStatus());
+      } catch (err) {
+        console.warn('[TranscriptScreen] Failed to get initial status:', err);
+      }
+    } catch (e) {
+      console.error('[TranscriptScreen] Failed to create AudioRecorder:', e);
+    }
+
+    return () => {
+      if (activeRecorder) {
+        try {
+          // Check if it's recording and stop it
+          if (activeRecorder.isRecording) {
+            activeRecorder.stop().catch(() => {});
+          }
+        } catch (e) {
+          // Ignore if already stopped/released
+        }
+        try {
+          activeRecorder.release();
+        } catch (e) {
+          console.warn('[TranscriptScreen] Failed to release recorder:', e);
+        }
+      }
+    };
+  }, []);
+
+  // Poll status updates safely
+  useEffect(() => {
+    if (!recorder) return;
+
+    const intervalId = setInterval(() => {
+      try {
+        // Safe check in case recorder gets released on unmount
+        const newState = recorder.getStatus();
+        setRecorderState((prevState) => {
+          const meteringChanged = (prevState.metering === undefined) !== (newState.metering === undefined) ||
+              (prevState.metering !== undefined &&
+                  newState.metering !== undefined &&
+                  Math.abs(prevState.metering - newState.metering) > 0.1);
+          if (prevState.canRecord !== newState.canRecord ||
+              prevState.isRecording !== newState.isRecording ||
+              Math.abs(prevState.durationMillis - newState.durationMillis) > 50 ||
+              meteringChanged) {
+              return newState;
+          }
+          return prevState;
+        });
+      } catch (err) {
+        clearInterval(intervalId);
+      }
+    }, 100);
+
+    return () => clearInterval(intervalId);
+  }, [recorder]);
 
   // Metering levels sync
   useEffect(() => {
-    if (audioRecorder.isRecording && typeof recorderState.metering === 'number') {
+    if (recorderState.isRecording && typeof recorderState.metering === 'number') {
       setMeteringLevels(prev => {
         const newLevels = [...prev, recorderState.metering || -160];
         return newLevels.slice(-20);
       });
     }
-  }, [recorderState.metering, audioRecorder.isRecording]);
+  }, [recorderState.metering, recorderState.isRecording]);
 
   const [isProcessing, setIsProcessing] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -221,17 +321,14 @@ export default function TranscriptionScreen() {
     })();
   }, []);
 
-  // Cleanup recording on unmount
+  // Cleanup streaming and TTS on unmount
   useEffect(() => {
     return () => {
-      console.log('[TranscriptScreen] Unmounting - cleaning up recording');
+      console.log('[TranscriptScreen] Unmounting - cleaning up streaming/TTS');
       isStreamingRef.current = false;
       TTSService.stop().catch(() => {});
       if (chunkIntervalRef.current) {
         clearInterval(chunkIntervalRef.current);
-      }
-      if (audioRecorder.isRecording) {
-        audioRecorder.stop().catch(() => {});
       }
     };
   }, []); // Empty dependency array = runs only on mount/unmount
@@ -253,13 +350,17 @@ export default function TranscriptionScreen() {
 
   const startRecording = async () => {
     console.log('[TranscriptScreen] startRecording called');
+    if (!recorder) {
+      console.warn('[TranscriptScreen] Recorder is not initialized');
+      return null;
+    }
     try {
       setMeteringLevels([]);
 
       // ── GUARD: Stop any existing recording before creating a new one ──
-      if (audioRecorder.isRecording) {
+      if (recorderState.isRecording) {
         try {
-          await audioRecorder.stop();
+          await recorder.stop();
         } catch (_) {
           // Ignore
         }
@@ -275,14 +376,14 @@ export default function TranscriptionScreen() {
           return null;
       }
 
-      await audioRecorder.prepareToRecordAsync({
+      await recorder.prepareToRecordAsync({
         ...RecordingPresets.HIGH_QUALITY,
         isMeteringEnabled: true,
       });
-      await audioRecorder.record();
+      await recorder.record();
 
       console.log('[TranscriptScreen] Recording started successfully');
-      return audioRecorder;
+      return recorder;
     } catch (err) {
       console.error('[Recording Error]', err);
       Alert.alert('Error', 'Could not start recording: ' + (err as any).message);
@@ -292,12 +393,12 @@ export default function TranscriptionScreen() {
 
 
   const stopAndTranscribe = async () => {
-    if (!audioRecorder.isRecording) return;
+    if (!recorder || !recorderState.isRecording) return;
 
     try {
       setIsProcessing(true);
-      await audioRecorder.stop();
-      const uri = audioRecorder.uri;
+      await recorder.stop();
+      const uri = recorder.uri;
 
       if (!uri) {
         Alert.alert('Error', 'No audio recorded');
@@ -391,19 +492,24 @@ export default function TranscriptionScreen() {
             return;
         }
 
-        if (audioRecorder.isRecording) {
+        let isRecordingNow = false;
+        try {
+          isRecordingNow = !!(recorder && recorder.isRecording);
+        } catch (e) {}
+
+        if (isRecordingNow && recorder) {
           try {
             // Check metering levels for VAD (Voice Activity Detection)
             // If levels are extremely low, it's silence or background noise
             const isSpeech = AudioPreprocessingService.isSpeechDetected(meteringLevels);
             
             // 1. Stop current
-            await audioRecorder.stop();
-            const uri = audioRecorder.uri;
+            await recorder.stop();
+            const uri = recorder.uri;
 
             // 2. Send chunk ONLY if speech was detected OR chunk id is 0 (to keep connection alive)
             if (uri && isStreamingRef.current) {
-              if (isSpeech || (audioRecorder as any)._chunkCounter === 0) {
+              if (isSpeech || (recorder as any)._chunkCounter === 0) {
                 console.log('[Live ASR] Sending chunk (Speech detected)...');
                 streamingASRService.sendAudioChunk(uri).catch(err =>
                   console.error('[Live ASR] Send error:', err)
@@ -427,7 +533,11 @@ export default function TranscriptionScreen() {
           } catch (error) {
             console.error('[Live ASR] Chunking error:', error);
             // Try to recover by restarting recording if it failed
-            if (!audioRecorder.isRecording && isStreamingRef.current) {
+            let isRec = false;
+            try {
+              isRec = !!(recorder && recorder.isRecording);
+            } catch (e) {}
+            if (!isRec && isStreamingRef.current) {
               await new Promise(resolve => setTimeout(resolve, 500));
               await startRecording();
             }
@@ -461,9 +571,13 @@ export default function TranscriptionScreen() {
       }
 
       // Stop current recording
-      if (audioRecorder.isRecording) {
+      let isRec = false;
+      try {
+        isRec = !!(recorder && recorder.isRecording);
+      } catch (e) {}
+      if (isRec && recorder) {
         try {
-          await audioRecorder.stop();
+          await recorder.stop();
         } catch (e) {
           // Ignore if already stopped
         }
@@ -586,7 +700,7 @@ export default function TranscriptionScreen() {
         showsVerticalScrollIndicator={false}
       >
         {/* Empty State */}
-        {messages.length === 0 && !recording && !isProcessing && (
+        {messages.length === 0 && !isRecording && !isProcessing && (
           <View style={styles.emptyState}>
             <View style={[styles.welcomeCard, { backgroundColor: colors.card, borderColor: colors.border + '50' }]}>
               <TouchableOpacity
@@ -629,7 +743,7 @@ export default function TranscriptionScreen() {
           <TouchableOpacity
             style={[styles.modeButton, !isLiveMode && [styles.modeButtonActive, { backgroundColor: colors.primary }]]}
             onPress={() => setIsLiveMode(false)}
-            disabled={!!(recording || isStreaming)}
+            disabled={isRecording || isStreaming}
           >
             <Text style={[styles.modeButtonText, { color: colors.subText }, !isLiveMode && styles.modeButtonTextActive]}>
               {t.transcript.batchMode}
@@ -638,7 +752,7 @@ export default function TranscriptionScreen() {
           <TouchableOpacity
             style={[styles.modeButton, isLiveMode && [styles.modeButtonActive, { backgroundColor: colors.primary }]]}
             onPress={() => setIsLiveMode(true)}
-            disabled={!!(recording || isStreaming)}
+            disabled={isRecording || isStreaming}
           >
             <Animated.View style={{ opacity: isLiveMode ? blinkAnim : 1, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
               <Text style={{ fontSize: 12, color: isLiveMode ? (colors.bg === '#111111' ? '#111111' : '#FFFFFF') : colors.subText }}>🔴</Text>
@@ -708,9 +822,9 @@ export default function TranscriptionScreen() {
         )}
 
         {/* Waveform */}
-        {(recording || isStreaming) && (
+        {(isRecording || isStreaming) && (
           <View style={styles.waveformContainer}>
-            <WaveformVisualizer isActive={!!(recording || isStreaming)} levels={meteringLevels} />
+            <WaveformVisualizer isActive={isRecording || isStreaming} levels={meteringLevels} />
           </View>
         )}
 
@@ -719,20 +833,20 @@ export default function TranscriptionScreen() {
           style={[
             styles.micButton,
             { backgroundColor: colors.primary, shadowColor: colors.primary },
-            (recording || isStreaming) && [styles.micButtonActive, { backgroundColor: colors.danger, shadowColor: colors.danger }],
+            (isRecording || isStreaming) && [styles.micButtonActive, { backgroundColor: colors.danger, shadowColor: colors.danger }],
           ]}
           onPress={() => {
             if (hapticEnabled) haptics.medium();
             if (isLiveMode) {
               isStreaming ? stopLiveTranscription() : startLiveTranscription();
             } else {
-              recording ? stopAndTranscribe() : startRecording();
+              isRecording ? stopAndTranscribe() : startRecording();
             }
           }}
           activeOpacity={0.8}
           disabled={isProcessing}
         >
-          {(recording || isStreaming) ? (
+          {(isRecording || isStreaming) ? (
             <Square size={36} color={colors.bg === '#111111' ? '#111111' : '#FFFFFF'} fill={colors.bg === '#111111' ? '#111111' : '#FFFFFF'} />
           ) : (
             <Mic size={44} color={colors.bg === '#111111' ? '#111111' : '#FFFFFF'} />
@@ -740,7 +854,7 @@ export default function TranscriptionScreen() {
         </TouchableOpacity>
 
         <Text style={[styles.statusText, { color: colors.subText }]}>
-          {(recording || isStreaming)
+          {(isRecording || isStreaming)
             ? (isLiveMode ? t.transcript.tapToStopLive : t.transcript.tapToProcess)
             : (isLiveMode ? t.transcript.tapToStartLive : t.transcript.tapToSpeak)
           }

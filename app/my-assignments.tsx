@@ -10,7 +10,8 @@
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useAudioRecorder, useAudioRecorderState, RecordingPresets, AudioModule } from 'expo-audio';
+import { RecordingPresets, AudioModule } from 'expo-audio';
+import type { AudioRecorder } from 'expo-audio';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import {
@@ -32,6 +33,7 @@ import {
     TouchableOpacity,
     View,
     Dimensions,
+    Platform,
 } from 'react-native';
 import ConfettiCannon from 'react-native-confetti-cannon';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -108,9 +110,102 @@ export default function MyAssignmentsScreen() {
     const [isProcessing, setIsProcessing] = useState(false);
     const [transcript, setTranscript] = useState<Record<string, string>>({});
     
-    // Recording hook
-    const audioRecorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
-    const recorderState = useAudioRecorderState(audioRecorder, 100);
+    const [audioRecorder, setAudioRecorder] = useState<AudioRecorder | null>(null);
+    const [recorderState, setRecorderState] = useState<{
+        canRecord: boolean;
+        isRecording: boolean;
+        durationMillis: number;
+        metering?: number;
+    }>({
+        canRecord: false,
+        isRecording: false,
+        durationMillis: 0,
+        metering: -160,
+    });
+
+    // Initialize AudioRecorder and handle cleanup on unmount
+    useEffect(() => {
+        let activeRecorder: AudioRecorder | null = null;
+        try {
+            const commonOptions = {
+                extension: '.m4a',
+                sampleRate: 44100,
+                numberOfChannels: 2,
+                bitRate: 128000,
+                isMeteringEnabled: true,
+            };
+            const platformOptions = Platform.OS === 'ios' ? {
+                ...commonOptions,
+                outputFormat: 'aac ', // IOSOutputFormat.MPEG4AAC
+                audioQuality: 127, // AudioQuality.MAX
+                linearPCMBitDepth: 16,
+                linearPCMIsBigEndian: false,
+                linearPCMIsFloat: false,
+            } : Platform.OS === 'android' ? {
+                ...commonOptions,
+                outputFormat: 'mpeg4',
+                audioEncoder: 'aac',
+            } : {
+                ...commonOptions,
+                mimeType: 'audio/webm',
+                bitsPerSecond: 128000,
+            };
+            
+            activeRecorder = new AudioModule.AudioRecorder(platformOptions as any);
+            setAudioRecorder(activeRecorder);
+            
+            try {
+                setRecorderState(activeRecorder.getStatus());
+            } catch (err) {
+                console.warn('[MyAssignments] Failed to get initial status:', err);
+            }
+        } catch (e) {
+            console.error('[MyAssignments] Failed to create AudioRecorder:', e);
+        }
+
+        return () => {
+            if (activeRecorder) {
+                try {
+                    if (activeRecorder.isRecording) {
+                        activeRecorder.stop().catch(() => {});
+                    }
+                } catch (e) {}
+                try {
+                    activeRecorder.release();
+                } catch (e) {
+                    console.warn('[MyAssignments] Failed to release recorder:', e);
+                }
+            }
+        };
+    }, []);
+
+    // Poll status updates safely
+    useEffect(() => {
+        if (!audioRecorder) return;
+
+        const intervalId = setInterval(() => {
+            try {
+                const newState = audioRecorder.getStatus();
+                setRecorderState((prevState) => {
+                    const meteringChanged = (prevState.metering === undefined) !== (newState.metering === undefined) ||
+                        (prevState.metering !== undefined &&
+                            newState.metering !== undefined &&
+                            Math.abs(prevState.metering - newState.metering) > 0.1);
+                    if (prevState.canRecord !== newState.canRecord ||
+                        prevState.isRecording !== newState.isRecording ||
+                        Math.abs(prevState.durationMillis - newState.durationMillis) > 50 ||
+                        meteringChanged) {
+                        return newState;
+                    }
+                    return prevState;
+                });
+            } catch (err) {
+                clearInterval(intervalId);
+            }
+        }, 100);
+
+        return () => clearInterval(intervalId);
+    }, [audioRecorder]);
 
     const hasAnnouncedRef = useRef(false);
 
@@ -120,11 +215,6 @@ export default function MyAssignmentsScreen() {
     useEffect(() => {
         loadData();
         requestMicPermission();
-        return () => {
-            if (audioRecorder.isRecording) {
-                audioRecorder.stop().catch(() => {});
-            }
-        };
     }, []);
 
     // Reload goals when selected date changes
@@ -224,6 +314,7 @@ export default function MyAssignmentsScreen() {
 
     // ─── ASR: Start recording for a specific goal ──────────────────────────
     const startRecording = async (goalId: string) => {
+        if (!audioRecorder) return;
         try {
             await TTSService.stop();
             setSpeakingId(null);
@@ -241,7 +332,7 @@ export default function MyAssignmentsScreen() {
     };
 
     const stopAndTranscribe = async () => {
-        if (!audioRecorder.isRecording || !activeGoalId) return;
+        if (!audioRecorder || !audioRecorder.isRecording || !activeGoalId) return;
 
         setIsRecording(false);
         setIsProcessing(true);

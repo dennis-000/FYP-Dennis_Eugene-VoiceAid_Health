@@ -103,7 +103,7 @@ export const TTSService = {
                         // Play the WAV file
                         const player = createAudioPlayer(uri);
                         player.shouldCorrectPitch = true;
-                        player.playbackRate = rate;
+                        player.setPlaybackRate(rate);
                         currentSound = player;
 
                         // Log when playback completes

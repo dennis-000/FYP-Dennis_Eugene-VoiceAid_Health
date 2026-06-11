@@ -18,39 +18,50 @@ export const HistoryService = {
     addLog: async (log: TranscriptionLog | Omit<TranscriptionLog, 'id' | 'timestamp'>) => {
         try {
             const patientId = await AsyncStorage.getItem('@voiceaid_patient_id');
-            const isGuest = !patientId || patientId === 'guest_user' || patientId === 'guest';
+            // If log has a specific user_id, it is targeted at a patient (e.g. from caregiver view)
+            const targetPatientId = ('user_id' in log && log.user_id) ? log.user_id : patientId;
+            
+            const isGuest = !targetPatientId || targetPatientId === 'guest_user' || targetPatientId === 'guest';
 
-            if (isGuest) {
-                console.log("[History] Guest session detected, saving to local AsyncStorage.");
-                const localLog: TranscriptionLog = {
-                    id: `guest-log-${Date.now()}`,
-                    timestamp: Date.now(),
-                    text: log.text,
-                    detectedLanguage: log.detectedLanguage || 'en',
-                    intentCategory: log.intentCategory || 'Transcription'
-                };
-                const currentLocal = await AsyncStorage.getItem('@voiceaid_guest_history');
+            const localLog: TranscriptionLog = {
+                id: `log-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+                timestamp: Date.now(),
+                text: log.text,
+                detectedLanguage: log.detectedLanguage || 'en',
+                intentCategory: log.intentCategory || 'Transcription',
+                user_id: targetPatientId || undefined
+            };
+
+            // Always save to local history for the patient's own UI (unless caregiver is logging for a patient on another device)
+            const isCaregiverTargeted = 'user_id' in log && log.user_id && log.user_id !== patientId;
+            if (!isCaregiverTargeted) {
+                const storageKey = isGuest ? '@voiceaid_guest_history' : `@voiceaid_patient_history_${targetPatientId}`;
+                const currentLocal = await AsyncStorage.getItem(storageKey);
                 const history = currentLocal ? JSON.parse(currentLocal) : [];
-                await AsyncStorage.setItem('@voiceaid_guest_history', JSON.stringify([localLog, ...history]));
-                return localLog;
+                await AsyncStorage.setItem(storageKey, JSON.stringify([localLog, ...history]));
             }
 
-            // For Hospital Patients (Connected via Code)
-            const { data, error } = await supabase
-                .from('transcriptions')
-                .insert({
-                    patient_profile_id: patientId,
-                    text: log.text,
-                    language: log.detectedLanguage || 'en'
-                })
-                .select()
-                .single();
+            if (!isGuest) {
+                // For Hospital Patients (Connected via Code)
+                // Insert to Supabase for therapist's visibility, but do NOT select/read back to avoid SELECT RLS policy issues for anonymous patients.
+                const { error } = await supabase
+                    .from('transcriptions')
+                    .insert({
+                        patient_profile_id: targetPatientId,
+                        text: log.text,
+                        language: log.detectedLanguage || 'en'
+                    });
 
-            if (error) throw error;
-            console.log("[History] Log saved to Supabase:", data.id);
-            return data;
+                if (error) {
+                    console.error("[History] Failed to sync log to Supabase:", error);
+                } else {
+                    console.log("[History] Log successfully synced to Supabase");
+                }
+            }
+
+            return localLog;
         } catch (e) {
-            console.error("[History] Failed to save log to Supabase", e);
+            console.error("[History] Failed to add log", e);
             throw e;
         }
     },
@@ -58,29 +69,13 @@ export const HistoryService = {
     getLogs: async (): Promise<TranscriptionLog[]> => {
         try {
             const patientId = await AsyncStorage.getItem('@voiceaid_patient_id');
-            if (!patientId || patientId === 'guest_user' || patientId === 'guest') {
-                const localData = await AsyncStorage.getItem('@voiceaid_guest_history');
-                return localData ? JSON.parse(localData) : [];
-            }
-
-            const { data, error } = await supabase
-                .from('transcriptions')
-                .select('*')
-                .or(`user_id.eq.${patientId},patient_profile_id.eq.${patientId}`)
-                .order('created_at', { ascending: false });
-
-            if (error) throw error;
-
-            return data.map(row => ({
-                id: row.id,
-                timestamp: new Date(row.created_at).getTime(),
-                text: row.text,
-                detectedLanguage: row.language,
-                intentCategory: 'Transcription',
-                user_id: row.user_id || row.patient_profile_id
-            }));
+            const isGuest = !patientId || patientId === 'guest_user' || patientId === 'guest';
+            
+            const storageKey = isGuest ? '@voiceaid_guest_history' : `@voiceaid_patient_history_${patientId}`;
+            const localData = await AsyncStorage.getItem(storageKey);
+            return localData ? JSON.parse(localData) : [];
         } catch (e) {
-            console.error("[History] Failed to fetch logs from Supabase", e);
+            console.error("[History] Failed to fetch local logs", e);
             return [];
         }
     },
@@ -155,19 +150,23 @@ export const HistoryService = {
     clearLogs: async () => {
         try {
             const patientId = await AsyncStorage.getItem('@voiceaid_patient_id');
-            if (!patientId || patientId === 'guest_user' || patientId === 'guest') {
-                await AsyncStorage.removeItem('@voiceaid_guest_history');
-                return;
+            const isGuest = !patientId || patientId === 'guest_user' || patientId === 'guest';
+            
+            const storageKey = isGuest ? '@voiceaid_guest_history' : `@voiceaid_patient_history_${patientId}`;
+            await AsyncStorage.removeItem(storageKey);
+
+            if (!isGuest) {
+                const { error } = await supabase
+                    .from('transcriptions')
+                    .delete()
+                    .or(`user_id.eq.${patientId},patient_profile_id.eq.${patientId}`);
+
+                if (error) {
+                    console.error("[History] Failed to clear Supabase logs:", error);
+                }
             }
-
-            const { error } = await supabase
-                .from('transcriptions')
-                .delete()
-                .or(`user_id.eq.${patientId},patient_profile_id.eq.${patientId}`);
-
-            if (error) throw error;
         } catch (e) {
-            console.error("[History] Failed to clear Supabase logs", e);
+            console.error("[History] Failed to clear logs", e);
         }
     },
 
