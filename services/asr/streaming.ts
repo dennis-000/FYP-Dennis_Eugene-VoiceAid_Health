@@ -86,42 +86,75 @@ export class StreamingASRService {
                         } else if (this.onTranscription) {
                             this.isProcessingChunk = false;
                             this.processQueue(); // Process next in queue
-                            
+
                             const cleanText = (data.text || "").trim();
 
                             // Expanded hallucination blocklist.
                             // These are phrases Whisper generates when it hears silence or background noise.
                             const hallucinations = [
                                 // Original blocklist
-                                "Mmarima.", "Wɔredidi.", "Ɔbarima bi reyɛ adwuma.",
-                                "Wɔnom dware nsuo mu.", "Nnipa bebree na ɔmo gyina hɔ.",
-                                "你", "You",
+                                "mmarima", "wɔredidi", "ɔbarima bi reyɛ adwuma",
+                                "wɔnom dware nsuo mu", "nnipa bebree na ɔmo gyina hɔ",
+                                "你", "you", "lantikah", "anay du",
                                 // Newly observed hallucinations (background noise triggers)
-                                "Wɔredware nkɔmmɔ.", "Sogyafoɔ no wɔ hɔ.",
-                                "Wɔnom dɔɔso bɛyɛ dɔɔso.", "Sɔre.",
-                                "Ɔmo te sɛ yi.", "Wɔnom dware pɔnkɔ so.",
-                                "Wɔnom dɔɔso bɛyɛ dɔ", "Wɔnom dɔɔso.",
-                                "Nnipa no.", "Ɔdɔ.", "Wɔredware.",
-                                "Ɔdɔ no.", "Wɔredware pɔnkɔ so.",
-                                "Nnipa bebree.", "Wɔredidi no.",
+                                "wɔredware nkɔmmɔ", "sogyafoɔ no wɔ hɔ",
+                                "wɔnom dɔɔso bɛyɛ dɔɔso", "sɔre",
+                                "ɔmo te sɛ yi", "wɔnom dware pɔnkɔ so",
+                                "wɔnom dɔɔso bɛyɛ dɔ", "wɔnom dɔɔso",
+                                "nnipa no", "ɔdɔ", "wɔredware",
+                                "ɔdɔ no", "wɔredware pɔnkɔ so",
+                                "nnipa bebree", "wɔredidi no",
                                 // English noise hallucinations
-                                "Thank you.", "Thank you", "Thanks.", "Okay.", "Okay",
-                                "Ɔbaa no gyina nsuo mu.", "Wɔnom dware nsuo mu. Ɔbaa no gyina nsuo mu.",
-                                "Wɔnom resere.",
+                                "thank you", "thanks", "okay",
+                                "ɔbaa no gyina nsuo mu", "wɔnom dware nsuo mu ɔbaa no gyina nsuo mu",
+                                "wɔnom resere",
+                                // Advanced noise/silence hallucinations from logs
+                                "nnipa bebree na ɔmo gyina hɔ ɛnna ɔmo ɛrehwɛ ɔmo",
+                                "nipa bebree na ɔmo gyina hɔ",
+                                "wɔnom gyina hɔ",
+                                "ɔmoayɛ no",
+                                "kwan no mu",
+                                "ah", "ahem", "go ahead", "shibuya station",
+                                // specific Akan fine-tuning artifacts
+                                "satahoɔ sere, wo maame de ne ti gu adeɛ bi",
+                                "wei a mic foɔ no na afie ase rekasa",
+                                "ɔmo resa. ɛnna ɔmo resa",
+                                "nkorɔfoɔ bi gyina nkurɔfoɔ no kɔn",
+                                "bankye, bɔkye",
+                                "mmarima me sɛ memmura sie",
+                                "n'adeɛ aso kaa no, ahenkan bi yɛ gyaase. saa nkorɔfoɔ",
+                                "nkwadaa",
+                                "nkwadaa bɛn na ɔmo reko sukuu no, me ti pa ara yie menantew. me ti kasa n’enyi",
+                                "obi yɛ ketewa bi gyina nam saa atam hɔ de, ɔrekyerɛ biribi",
+                                "ɔmo de nsuo fufuo no ara. mekyirabeka ma ɔmote mu a",
+                                "nkorɔfoɔ bebree wɔ ntaade, na ɛha nkurɔfoɔ no de ne mpaboa redidi",
+                                "ne maame sɛ ɔpɛ sɛ ɔwɔ dwa",
+                                "efie bi gyina hɔ, ɛna ebi da"
                             ];
 
                             // Block model uncertainty/metadata markers — never real transcriptions
                             const isUncertaintyMarker = /^\s*\([^)]{0,40}\)[.,]?\s*$/.test(cleanText);
+
+                            // Block Asian characters (Whisper glitches out and emits Japanese train names on silence)
+                            const hasAsianChars = /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\uFAD9\uFF66-\uFF9F]/.test(cleanText);
+
                             if (isUncertaintyMarker) {
                                 console.log(`[Streaming ASR] ❓ Dropping model metadata marker: "${cleanText}"`);
                                 return;
                             }
 
-                            // Also block anything suspiciously short (1-2 chars) which is pure noise
+                            if (hasAsianChars) {
+                                console.log(`[Streaming ASR] 🚫 Dropping hallucination (Asian chars): "${cleanText}"`);
+                                return;
+                            }
+
+                            const noPunctuationText = cleanText.toLowerCase().replace(/[.,!?¿¡]/g, '').trim();
+
+                            // Also block anything suspiciously short (1 char) which is pure noise
                             if (
-                                cleanText.length < 3 ||
-                                hallucinations.includes(cleanText) || 
-                                hallucinations.some(h => cleanText === h.replace('.', '') || cleanText.startsWith(h.replace('.', '')))
+                                noPunctuationText.length < 2 ||
+                                hallucinations.includes(noPunctuationText) ||
+                                hallucinations.some(h => noPunctuationText === h || noPunctuationText.startsWith(h + " "))
                             ) {
                                 console.log(`[Streaming ASR] 🚫 Dropping hallucinated/noise chunk: "${cleanText}"`);
                                 return;
@@ -218,13 +251,20 @@ export class StreamingASRService {
 
             if (this.ws && this.ws.readyState === WebSocket.OPEN) {
                 this.ws.send(JSON.stringify(message));
+                // Immediately allow processing the next chunk after a short buffer delay
+                // to prevent the queue from stalling if the server never replies.
+                setTimeout(() => {
+                    this.isProcessingChunk = false;
+                    this.processQueue();
+                }, 500); 
             } else {
                 console.warn('[Streaming ASR] WebSocket closed while processing queue');
+                this.isProcessingChunk = false;
+                this.processQueue();
             }
         } catch (error) {
             console.error('[Streaming ASR] Failed to send audio chunk:', error);
-            // On error, we don't retry this specific chunk to prevent infinite loops,
-            // but we move to the next one.
+            // On error, we move to the next one immediately.
             this.isProcessingChunk = false;
             this.processQueue();
         }
@@ -235,7 +275,14 @@ export class StreamingASRService {
      */
     private async audioToBase64(uri: string): Promise<string> {
         try {
-            // Use fetch + FileReader approach (works on both web and React Native)
+            if (typeof document === 'undefined') {
+                const FileSystem = require('expo-file-system/legacy');
+                return await FileSystem.readAsStringAsync(uri, {
+                    encoding: 'base64',
+                });
+            }
+
+            // Fallback for Web platform
             const response = await fetch(uri);
             const blob = await response.blob();
 

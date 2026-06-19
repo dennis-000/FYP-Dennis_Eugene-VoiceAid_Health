@@ -53,7 +53,7 @@ export const HistoryService = {
                     });
 
                 if (error) {
-                    console.error("[History] Failed to sync log to Supabase:", error);
+                    console.warn("[History] Supabase sync pending (Ensure Migration 018 is run on your Supabase SQL Editor):", error.message);
                 } else {
                     console.log("[History] Log successfully synced to Supabase");
                 }

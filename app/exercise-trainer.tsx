@@ -63,11 +63,23 @@ export default function ExerciseTrainerScreen() {
     const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
     useEffect(() => {
-        loadData();
-        return () => {
-            if (timerRef.current) clearInterval(timerRef.current);
-        };
-    }, []);
+        const title = language === 'twi' 
+            ? 'Dwumadie no nni hɔ' 
+            : language === 'ga' 
+                ? 'Nifeemɔ nɛɛ bɛ' 
+                : 'Feature Disabled';
+        const msg = language === 'twi' 
+            ? 'Ahoɔden adwumayɛfoɔ (Exercise Trainer) no nni hɔ seesei.' 
+            : language === 'ga' 
+                ? 'Ano ahoɔden hewale nitsumɔ nɛɛ bɛɔ hɔ seesei.' 
+                : 'The Exercise Trainer feature is currently unavailable.';
+        
+        Alert.alert(
+            title,
+            msg,
+            [{ text: 'OK', onPress: () => router.replace('/home') }]
+        );
+    }, [language]);
 
     const loadData = async () => {
         setLoading(true);

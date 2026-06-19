@@ -69,7 +69,6 @@ export const PatientDashboard: React.FC<PatientDashboardProps> = ({
         { id: 'journal', route: '/journal' },
         { id: 'therapy-word-game', route: '/therapy-word-game' },
         { id: 'phrase-builder-quest', route: '/phrase-builder-quest' },
-        { id: 'exercise-trainer', route: '/exercise-trainer' },
         ...(patientType === 'hospital' ? [{ id: 'my-assignments', route: '/my-assignments' }] : []),
         { id: 'history', route: '/history' },
         { id: 'settings', route: '/settings' },
@@ -626,25 +625,7 @@ export const PatientDashboard: React.FC<PatientDashboardProps> = ({
 
 
 
-                        {/* Exercise Trainer (Available to all patients) */}
-                        <TouchableOpacity
-                            onPress={() => {
-                                haptics.selection();
-                                router.push('/exercise-trainer');
-                            }}
-                            activeOpacity={0.8}
-                            style={[
-                                styles.toolCard,
-                                getHighlightStyle('exercise-trainer'),
-                                { backgroundColor: colors.card, borderColor: colors.border }
-                            ]}
-                        >
-                            <View style={[styles.toolIcon, { backgroundColor: '#ecfdf5' }]}>
-                                <Dumbbell size={24} color="#10b981" strokeWidth={2} />
-                            </View>
-                            <Text style={[styles.toolText, { color: colors.text, fontSize: 15 * scale }]}>{tr('exercises')}</Text>
-                            <Text style={[styles.toolSubText, { fontSize: 12 * scale, color: colors.subText }]}>{tr('guidedTrainer')}</Text>
-                        </TouchableOpacity>
+                        {/* Exercise Trainer disabled on patient request (3D/animated trainer) */}
 
 
 

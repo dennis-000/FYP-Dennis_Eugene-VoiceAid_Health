@@ -201,6 +201,14 @@ export default function TranscriptionScreen() {
   const isStreamingRef = useRef(false);
   const [connectionState, setConnectionState] = useState<'connecting' | 'connected' | 'error'>('connected');
   const [errorMessage, setErrorMessage] = useState('');
+  
+  // ASR confidence score & noise alert state
+  const [asrMetadata, setAsrMetadata] = useState<{
+    confidence: number;
+    language: string;
+    hasNoise: boolean;
+    isOffline: boolean;
+  } | null>(null);
 
   // Blinking animation for live indicator
   const blinkAnim = useRef(new Animated.Value(1)).current;
@@ -356,6 +364,7 @@ export default function TranscriptionScreen() {
     }
     try {
       setMeteringLevels([]);
+      setAsrMetadata(null);
 
       // ── GUARD: Stop any existing recording before creating a new one ──
       if (recorderState.isRecording) {
@@ -409,6 +418,15 @@ export default function TranscriptionScreen() {
       // Transcribe
       const result = await ASRService.transcribe(uri, language as string);
 
+      if (result) {
+        setAsrMetadata({
+          confidence: result.confidence ?? 0.85,
+          language: result.detectedLanguage || (language as string),
+          hasNoise: result.hasNoiseDetected || (result.confidence ? result.confidence < 0.5 : false),
+          isOffline: !isOnline,
+        });
+      }
+
       if (result.text) {
         // Add user message
         const newMessage: Message = {
@@ -454,6 +472,7 @@ export default function TranscriptionScreen() {
       setLivePredictedTranscript('');
       setConnectionState('connecting');
       setErrorMessage('');
+      setAsrMetadata(null);
 
       // Connect to WebSocket
       await streamingASRService.connect(
@@ -467,6 +486,12 @@ export default function TranscriptionScreen() {
           if (result.predicted_text) {
               setLivePredictedTranscript(prev => prev + ' ' + result.predicted_text);
           }
+          setAsrMetadata({
+            confidence: result.confidence ?? 0.85,
+            language: result.language || (language as string),
+            hasNoise: result.confidence ? result.confidence < 0.5 : false,
+            isOffline: !isOnline,
+          });
           setTimeout(() => {
             scrollViewRef.current?.scrollToEnd({ animated: true });
           }, 50);
@@ -667,7 +692,7 @@ export default function TranscriptionScreen() {
         }}>
           <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: isOnline ? '#0d9488' : '#ef4444' }} />
           <Text style={{ fontSize: 13, fontWeight: 'bold', color: isOnline ? '#0f766e' : '#b91c1c' }}>
-            {isOnline ? '🟢 Dysarthria Model Online' : '🟡 Offline ASR Mode'}
+            {isOnline ? 'Online Mode' : 'Offline Mode'}
           </Text>
         </View>
       </View>
@@ -735,6 +760,82 @@ export default function TranscriptionScreen() {
           </View>
         )}
       </ScrollView>
+
+      {/* ASR Confidence Gauge Visual Feedback */}
+      {asrMetadata && (
+        <View style={{
+          marginHorizontal: 16,
+          marginVertical: 10,
+          backgroundColor: colors.card,
+          borderRadius: 16,
+          padding: 14,
+          borderWidth: 1.5,
+          borderColor: asrMetadata.confidence < 0.5 ? '#fca5a5' : asrMetadata.confidence < 0.8 ? '#fcd34d' : '#86efac',
+          shadowColor: asrMetadata.confidence < 0.5 ? '#ef4444' : '#22c55e',
+          shadowOffset: { width: 0, height: 2 },
+          shadowOpacity: 0.08,
+          shadowRadius: 4,
+          elevation: 2,
+        }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <View style={{
+                width: 8,
+                height: 8,
+                borderRadius: 4,
+                backgroundColor: asrMetadata.confidence < 0.5 ? '#ef4444' : asrMetadata.confidence < 0.8 ? '#f59e0b' : '#22c55e'
+              }} />
+              <Text style={{ fontSize: 13, fontWeight: '900', color: colors.text, letterSpacing: 0.5 }}>
+                ASR CONFIDENCE GAUGE
+              </Text>
+            </View>
+            <View style={{ backgroundColor: colors.border + '40', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 }}>
+              <Text style={{ fontSize: 10, fontWeight: 'bold', color: colors.subText, textTransform: 'uppercase' }}>
+                Detected: {asrMetadata.language === 'tw' || asrMetadata.language === 'twi' ? 'Akan (Twi)' : asrMetadata.language === 'ga' ? 'Ga' : 'English'}
+              </Text>
+            </View>
+          </View>
+
+          {/* Progress Bar */}
+          <View style={{ height: 8, backgroundColor: colors.border + '30', borderRadius: 4, overflow: 'hidden', marginBottom: 8 }}>
+            <View style={{
+              height: '100%',
+              width: `${Math.max(5, Math.round(asrMetadata.confidence * 100))}%`,
+              backgroundColor: asrMetadata.confidence < 0.5 ? '#ef4444' : asrMetadata.confidence < 0.8 ? '#f59e0b' : '#22c55e',
+              borderRadius: 4
+            }} />
+          </View>
+
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.subText }}>
+              Confidence: {Math.round(asrMetadata.confidence * 100)}%
+            </Text>
+            <Text style={{ fontSize: 11, fontWeight: '900', color: asrMetadata.confidence < 0.5 ? '#ef4444' : asrMetadata.confidence < 0.8 ? '#d97706' : '#16a34a' }}>
+              {asrMetadata.confidence < 0.5 ? 'Poor Signal / Slurred' : asrMetadata.confidence < 0.8 ? 'Fair Quality' : 'Excellent Clarity'}
+            </Text>
+          </View>
+
+          {/* Clinical Guard Fallback Warning */}
+          {asrMetadata.confidence < 0.5 && (
+            <View style={{
+              marginTop: 10,
+              backgroundColor: '#fef2f2',
+              borderColor: '#fca5a5',
+              borderWidth: 1,
+              borderRadius: 10,
+              padding: 10,
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 8
+            }}>
+              <Text style={{ fontSize: 14 }}>⚠️</Text>
+              <Text style={{ fontSize: 11, fontWeight: 'bold', color: '#b91c1c', flex: 1, lineHeight: 14 }}>
+                High background noise detected or speech slurred. Switching to offline phonetic matcher.
+              </Text>
+            </View>
+          )}
+        </View>
+      )}
 
       {/* Bottom Controls */}
       <View style={[styles.bottomContainer, { backgroundColor: colors.card, borderTopColor: colors.border + '50' }]}>

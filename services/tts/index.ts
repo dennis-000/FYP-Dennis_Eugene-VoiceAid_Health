@@ -1,5 +1,5 @@
 import { createAudioPlayer, setAudioModeAsync, AudioPlayer } from 'expo-audio';
-import * as FileSystem from 'expo-file-system/src/legacy';
+import * as FileSystem from 'expo-file-system/legacy';
 import * as Speech from 'expo-speech';
 import { ENDPOINTS } from '../../constants/config';
 import { DEFAULT_OPTIONS, SupportedTTSLanguage } from './config';
@@ -59,15 +59,15 @@ export const TTSService = {
                 const safeText = text.trim();
                 
                 const langCode = language === 'twi' ? 'tw' : 'ga';
-                const queryParams = new URLSearchParams({
-                    request_or_text: safeText,
-                    language: langCode,
-                    speed: (options?.speed || 1.0).toString()
-                }).toString();
-
-                const url = `${ENDPOINTS.TTS}?${queryParams}`;
-                const response = await fetch(url, {
-                    method: 'GET',
+                const response = await fetch(ENDPOINTS.TTS, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        text: safeText,
+                        language: langCode
+                    })
                 });
 
                 if (!response.ok) {

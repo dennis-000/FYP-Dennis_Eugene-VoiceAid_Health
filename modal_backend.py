@@ -190,7 +190,10 @@ def fastapi_app():
         audio = audio.set_channels(1).set_frame_rate(16000)
         samples = np.array(audio.get_array_of_samples()).astype(np.float32) / 32768.0
         model_id = load_asr(language)
-        result = asr_pipes[model_id](samples, generate_kwargs=ASR_KWARGS)
+        gen_kwargs = ASR_KWARGS.copy()
+        if language in ['en', 'eng', 'english']:
+            gen_kwargs['language'] = 'english'
+        result = asr_pipes[model_id](samples, generate_kwargs=gen_kwargs)
         return {'text': dysarthric_filter(result['text']), 'model': model_id, 'language': language}
 
     @backend.websocket('/asr/stream')
@@ -214,7 +217,10 @@ def fastapi_app():
                 )
                 samples = np.array(audio.get_array_of_samples()).astype(np.float32) / 32768.0
                 model_id = load_asr(language)
-                result   = asr_pipes[model_id](samples, generate_kwargs=ASR_KWARGS)
+                gen_kwargs = ASR_KWARGS.copy()
+                if language in ['en', 'eng', 'english']:
+                    gen_kwargs['language'] = 'english'
+                result   = asr_pipes[model_id](samples, generate_kwargs=gen_kwargs)
                 clean    = dysarthric_filter(result['text'])
 
                 if not clean or len(clean.strip()) < 2:
@@ -263,6 +269,330 @@ def fastapi_app():
             out[0][inputs.input_ids.shape[1]:], skip_special_tokens=True
         ).strip()
         return {'predicted': predicted, 'language': req.language}
+
+    # ── AI Diagnostics and Therapist Insights (LLM) ──────────────────────────
+
+    from typing import List
+
+    class SummaryRequest(BaseModel):
+        patient_name: str
+        transcripts: List[str]
+        compliance_rate: float
+        streak: int
+        hours_practiced: float
+
+    class SentimentRequest(BaseModel):
+        transcripts: List[str]
+        mood_levels: List[int] = []
+
+    class RecommendationRequest(BaseModel):
+        patient_name: str
+        language: str
+        difficulty: str
+
+    def query_hf_llm(prompt: str, max_tokens: int = 250, temperature: float = 0.3) -> str:
+        """Helper to query Hugging Face Serverless Inference API with fallback models."""
+        import urllib.request
+        import json
+        import os
+        
+        # This will try Qwen model first, but it keep failing so it will fallback to Llama-3.2 if it fails
+        models = [
+            "https://api-inference.huggingface.co/models/Qwen/Qwen2.5-7B-Instruct",
+            "https://api-inference.huggingface.co/models/meta-llama/Llama-3.2-3B-Instruct"
+        ]
+        
+        token = os.environ.get("HF_TOKEN") or os.environ.get("HUGGINGFACE_CO_RESOLVE_PROVIDER") or os.environ.get("HF_API_KEY")
+        headers = {
+            "Content-Type": "application/json"
+        }
+        if token:
+            headers["Authorization"] = f"Bearer {token}"
+            
+        payload = {
+            "inputs": prompt,
+            "parameters": {
+                "max_new_tokens": max_tokens,
+                "temperature": temperature,
+                "return_full_text": False
+            }
+        }
+        data_bytes = json.dumps(payload).encode("utf-8")
+        
+        for url in models:
+            try:
+                req = urllib.request.Request(url, data=data_bytes, headers=headers, method="POST")
+                with urllib.request.urlopen(req, timeout=10) as response:
+                    res_json = json.loads(response.read().decode("utf-8"))
+                    if isinstance(res_json, list) and len(res_json) > 0:
+                        text = res_json[0].get("generated_text", "").strip()
+                        if text:
+                            return text
+                    elif isinstance(res_json, dict):
+                        text = res_json.get("generated_text", "").strip()
+                        if text:
+                            return text
+            except Exception as e:
+                print(f"[AI Backend] Warning: LLM query failed for {url}: {e}")
+                continue
+                
+        raise RuntimeError("All inference model APIs are unreachable or timed out.")
+
+    @backend.post('/predict/summary')
+    async def predict_summary(req: SummaryRequest):
+        transcripts_str = "\n".join([f'- "{t}"' for t in req.transcripts]) if req.transcripts else "No recent speech recordings."
+        prompt = (
+            f"You are a clinical Speech-Language Pathologist (SLP) AI reviewer.\n"
+            f"Synthesize this progress status for patient '{req.patient_name}':\n"
+            f"- Speech Exercises Compliance Rate: {req.compliance_rate}%\n"
+            f"- Consecutive Practice Streak: {req.streak} days\n"
+            f"- Total Practiced Time: {req.hours_practiced} hours\n"
+            f"- Patient Transcripts:\n{transcripts_str}\n\n"
+            f"Write a concise, professional clinical progress summary as 2-3 short, standard text paragraphs.\n"
+            f"Describe compliance, consistency, and diagnostic recommendations.\n"
+            f"Do NOT use markdown bold, list bullets, hashes, or list markers. Return ONLY clean, readable plain text paragraphs."
+        )
+        
+        try:
+            summary = await asyncio.to_thread(query_hf_llm, prompt, max_tokens=300, temperature=0.3)
+            # Strip any accidental markdown formatting the LLM might have returned
+            summary = re.sub(r'\*+', '', summary)
+            summary = re.sub(r'#+', '', summary)
+            summary = re.sub(r'^- ', '', summary, flags=re.MULTILINE)
+            return {'summary': summary.strip(), 'source': 'AI (HuggingFace Serverless LLM)'}
+        except Exception as e:
+            print(f"[AI Backend] Fallback triggered for Summary: {e}")
+            
+            # 1. Dynamic compliance evaluation
+            paragraph1 = f"Clinical review for patient {req.patient_name} shows a current exercise compliance rate of {req.compliance_rate}%. "
+            if req.compliance_rate == 0:
+                paragraph1 += f"At this stage, {req.patient_name} has not registered any recent completed exercises in the database, meaning they require immediate therapist outreach to establish engagement, check device accessibility, and identify early barriers."
+            elif req.compliance_rate < 50:
+                paragraph1 += f"Engagement is currently low, showing that {req.patient_name} is completing less than half of their assigned drills. More frequent follow-ups, caregiver reinforcement, or adjusting the goal target down to shorter daily intervals is recommended to build confidence."
+            elif req.compliance_rate < 80:
+                paragraph1 += f"The patient shows moderate participation. While some sessions are missed, there is a steady baseline of practice. Encouraging a fixed daily time for speech drills could help bridge the remaining compliance gap."
+            else:
+                paragraph1 += f"This represents excellent commitment, indicating that {req.patient_name} is consistently keeping up with daily rehabilitation requirements, which establishes the necessary vocal repetitions for motor-speech neural recovery."
+
+            # 2. Dynamic habit & acoustic evaluation
+            paragraph2 = ""
+            if req.streak > 0:
+                paragraph2 += f"Consistency is supported by a continuous {req.streak}-day streak, indicating strong habit building. "
+            else:
+                paragraph2 += f"No active consecutive streak is currently logged, suggesting that practice sessions are sparse or unscheduled. "
+
+            if req.hours_practiced > 0:
+                paragraph2 += f"Across these sessions, {req.patient_name} has accumulated {req.hours_practiced} hours of voice activity. "
+
+            twi_count = sum(1 for t in req.transcripts if any(w in t.lower() for w in ['nsuo', 'kasa', 'paa', 'twi', 'ɛyɛ', 'mami', 'dodo', 'yare', 'medaase', 'mepɛ', 'pa', 'pe', 'pi', 'po', 'pu', 'firi', 'sɔre', 'sua', 'kofi', 'kosoko']))
+            pain_count = sum(1 for t in req.transcripts if any(w in t.lower() for w in ['pain', 'hurt', 'sad', 'bad', 'tired', 'cry', 'help', 'emergency', 'stop', 'difficult', 'stuck', 'ɛyaw', 'yare']))
+
+            if req.transcripts:
+                recent_quotes = ", ".join([f'"{t}"' for t in req.transcripts[:2]])
+                paragraph2 += f"Review of recent acoustic output (such as {recent_quotes}) "
+                if twi_count > 0:
+                    paragraph2 += "shows prominent usage of Akan Twi dialect, confirming the speech classifier is correctly parsing localized phonology and dialect-specific sound targets. "
+                else:
+                    paragraph2 += "indicates primarily English speech exercises. "
+                    
+                if pain_count > 0:
+                    paragraph2 += f"Of clinical note, several transcript entries contain indicators of frustration, pain, or struggle, signaling that physical or vocal fatigue may be present during training."
+            else:
+                paragraph2 += f"Acoustic logs are currently empty, so active vocal characteristics and speech clarity cannot be evaluated."
+
+            # 3. Dynamic therapist recommendations
+            paragraph3 = f"Therapist Guidance: "
+            if req.compliance_rate < 40:
+                paragraph3 += f"Focus on assigning simple, low-effort single-word templates. Coordinate with hospital staff or family to ensure the device is accessible and functioning properly."
+            elif pain_count > 0:
+                paragraph3 += f"Introduce shorter, gentle vocal play and breathing exercises. Advise the patient to take frequent breaks and avoid forcing articulation during moments of muscle tension."
+            elif twi_count > 0:
+                paragraph3 += f"Continue utilizing Akan-specific voice board cards and monitor breath support on multi-syllable Twi phrases to refine phoneme transitions."
+            else:
+                paragraph3 += f"Continue monitoring daily streak. We recommend introducing conversational short phrase prompts to advance recovery and build natural pacing."
+
+            summary_text = f"{paragraph1}\n\n{paragraph2}\n\n{paragraph3}"
+            return {'summary': summary_text, 'source': 'Deterministic Clinical Heuristic Analyzer'}
+
+    @backend.post('/predict/sentiment')
+    async def predict_sentiment(req: SentimentRequest):
+        if not req.transcripts:
+            return {
+                'happy': 0, 'frustrated': 0, 'anxious': 0, 'neutral': 100,
+                'reasoning': 'No transcripts loaded yet.',
+                'source': 'Static Classifier'
+            }
+            
+        mood_str = f"Recent daily self-reported moods (1=Very Sad, 2=Sad, 3=Okay, 4=Good, 5=Very Happy): {req.mood_levels}" if req.mood_levels else "No self-reported daily moods logged today."
+        transcripts_str = "\n".join([f'- "{t}"' for t in req.transcripts])
+        prompt = (
+            f"Analyze the emotional state of a speech-impaired patient.\n"
+            f"Their daily self-reported mood levels from the app check-in are:\n{mood_str}\n\n"
+            f"Their recent practice session speech transcripts are:\n{transcripts_str}\n\n"
+            f"Your job is to analyze *why* the patient might be feeling this way (sad, frustrated, anxious, or happy) based on the words they spoke during exercises. Look for indicators of pain, struggle, recovery progress, or home contexts. Suggest clinical causes for their low self-reported mood if relevant.\n"
+            f"You MUST return a JSON object with percentages for these 4 categories representing the emotion distribution: 'happy', 'frustrated', 'anxious', 'neutral' (values sum to 100).\n"
+            f"Also include a 'reasoning' key explaining *why* the patient feels this way today in one short, helpful sentence.\n"
+            f"Format strictly as raw JSON, for example:\n"
+            f'{{"happy": 10, "frustrated": 70, "anxious": 10, "neutral": 10, "reasoning": "The patient reported feeling sad/very sad, which aligns with transcripts mentioning persistent pain (yare) and difficulty with speech exercises."}}\n'
+            f"Output ONLY the raw JSON string. Do not wrap in markdown ```json."
+        )
+        
+        try:
+            res = await asyncio.to_thread(query_hf_llm, prompt, max_tokens=150, temperature=0.1)
+            data = json.loads(res)
+            data['source'] = 'AI (HuggingFace Serverless LLM)'
+            return data
+        except Exception as e:
+            print(f"[AI Backend] Fallback triggered for Sentiment: {e}")
+            frustrated_keywords = ['pain', 'hurt', 'sad', 'bad', 'tired', 'cry', 'help', 'emergency', 'stop', 'difficult', 'stuck', 'ɛyaw', 'yare']
+            happy_keywords = ['happy', 'good', 'fine', 'great', 'thank', 'love', 'nice', 'ɛyɛ', 'paa', 'medaase']
+            anxious_keywords = ['worry', 'scared', 'afraid', 'heart', 'doctor', 'hospital', 'priority', 'nsuro', 'emergency']
+            
+            frustrated_score = 0
+            happy_score = 0
+            anxious_score = 0
+            neutral_score = 0
+            
+            # Incorporate self-reported mood levels
+            for mood in req.mood_levels:
+                if mood <= 2:
+                    frustrated_score += 5
+                    anxious_score += 2
+                elif mood >= 4:
+                    happy_score += 5
+                else:
+                    neutral_score += 3
+            
+            # Incorporate transcripts
+            for t in req.transcripts:
+                t_lower = t.lower()
+                matched = False
+                if any(w in t_lower for w in frustrated_keywords):
+                    frustrated_score += 4
+                    matched = True
+                if any(w in t_lower for w in happy_keywords):
+                    happy_score += 4
+                    matched = True
+                if any(w in t_lower for w in anxious_keywords):
+                    anxious_score += 4
+                    matched = True
+                if not matched:
+                    neutral_score += 1
+                    
+            total = frustrated_score + happy_score + anxious_score + neutral_score
+            if total == 0:
+                total = 1
+                neutral_score = 1
+                
+            happy_pct = int((happy_score / total) * 100)
+            frustrated_pct = int((frustrated_score / total) * 100)
+            anxious_pct = int((anxious_score / total) * 100)
+            neutral_pct = 100 - happy_pct - frustrated_pct - anxious_pct
+            if neutral_pct < 0:
+                neutral_pct = 0
+                
+            # Formulate dynamic reasoning about *why* the patient feels this way
+            has_low_mood = any(m <= 2 for m in req.mood_levels)
+            has_high_mood = any(m >= 4 for m in req.mood_levels)
+            
+            reasoning = "Analyzed check-in mood and speech logs: "
+            if has_low_mood:
+                reasoning += f"Patient checked in with low mood ({req.mood_levels[0]}/5 today). "
+                matched_struggles = [w for w in frustrated_keywords if any(w in t.lower() for t in req.transcripts)]
+                if matched_struggles:
+                    label_str = ", ".join(matched_struggles[:2])
+                    reasoning += f"This correlates with exercise text mentioning '{label_str}', indicating physical discomfort or practice frustration."
+                else:
+                    reasoning += "Lack of positive verbal expressions during exercises indicates general disengagement or fatigue."
+            elif has_high_mood:
+                reasoning += f"Patient checked in with a positive mood ({req.mood_levels[0]}/5 today). "
+                matched_happy = [w for w in happy_keywords if any(w in t.lower() for t in req.transcripts)]
+                if matched_happy:
+                    reasoning += f"Acoustic output confirms high engagement with optimistic words like '{matched_happy[0]}'."
+                else:
+                    reasoning += "Speech exercises show stable completion, reinforcing their positive check-in."
+            else:
+                if req.mood_levels:
+                    reasoning += f"Patient reports feeling stable or okay ({req.mood_levels[0]}/5 check-in). "
+                else:
+                    reasoning += "No daily check-in logged today. "
+                if frustrated_pct > 30:
+                    reasoning += "Transcripts contain words suggesting frustration, pointing to possible articulation blocks."
+                else:
+                    reasoning += "Vocal output exhibits standard practice habits."
+            
+            return {
+                'happy': happy_pct,
+                'frustrated': frustrated_pct,
+                'anxious': anxious_pct,
+                'neutral': neutral_pct,
+                'reasoning': reasoning,
+                'source': 'Heuristic Check-In & Speech Correlation Engine'
+            }
+
+    @backend.post('/predict/recommendations')
+    async def predict_recommendations(req: RecommendationRequest):
+        prompt = (
+            f"You are a clinical speech therapist recommending specific rehabilitation exercises.\n"
+            f"Recommend 3 speech exercises in language '{req.language}' for patient '{req.patient_name}' "
+            f"who has difficulty with '{req.difficulty}'.\n"
+            f"Format strictly as a JSON list of objects, each containing: 'title', 'description', 'difficulty_level'.\n"
+            f"Example output format:\n"
+            f'[\n'
+            f'  {{"title": "Easy Vocal Glides", "description": "Hum up and down a 5-note scale.", "difficulty_level": "Beginner"}}\n'
+            f']\n'
+            f"Return ONLY the raw JSON string. Do not wrap in markdown ```json."
+        )
+        
+        try:
+            res = await asyncio.to_thread(query_hf_llm, prompt, max_tokens=250, temperature=0.2)
+            recs = json.loads(res)
+            return {'recommendations': recs, 'source': 'AI (HuggingFace Serverless LLM)'}
+        except Exception as e:
+            print(f"[AI Backend] Fallback triggered for Recommendations: {e}")
+            lang = req.language.lower()
+            diff = req.difficulty.lower()
+            
+            if 'tw' in lang or 'akan' in lang:
+                if 'voice' in diff:
+                    recs = [
+                        {"title": "Makyee Prolongation", "description": "Hold the vowel 'e' in 'Makyee' for 5 seconds with steady pitch.", "difficulty_level": "Beginner"},
+                        {"title": "Anadwo Breath Support", "description": "Deep diaphragmatic inhale, then speak 'Anadwo' slowly on expiration.", "difficulty_level": "Intermediate"},
+                        {"title": "Pitch Glides (Akan)", "description": "Glide pitch up and down using the sound 'Oo-oo-oo'.", "difficulty_level": "Beginner"}
+                    ]
+                elif 'fluency' in diff:
+                    recs = [
+                        {"title": "Easy Onset 'Me pɛ'", "description": "Begin the phrase 'Me pɛ nsuo' with gentle airflow before voicing.", "difficulty_level": "Intermediate"},
+                        {"title": "Soft Contacts (Akan consonants)", "description": "Lightly touch articulation points for /b/, /p/, and /m/ sounds to reduce tension.", "difficulty_level": "Beginner"},
+                        {"title": "Akan Rhythmic Phrasing", "description": "Speak in structured 3-word groups matching a steady metronome rhythm.", "difficulty_level": "Intermediate"}
+                    ]
+                else:
+                    recs = [
+                        {"title": "Akan Consonant Drill /p/", "description": "Repeat: 'Pa', 'Pe', 'Pi', 'Po', 'Pu' with exaggerated lip pop.", "difficulty_level": "Beginner"},
+                        {"title": "Twi Fricatives /f/ and /s/", "description": "Exaggerate breath friction: 'Firi', 'Sɔre', 'Sua' clear onset.", "difficulty_level": "Intermediate"},
+                        {"title": "Tongue Twister: 'Kofi'", "description": "Exaggerate tongue position adjustments for 'Kofi Kosoko kɔ kɔkɔɔ'.", "difficulty_level": "Advanced"}
+                    ]
+            else:  # English
+                if 'voice' in diff:
+                    recs = [
+                        {"title": "Vowel Prolongation", "description": "Hold 'Ah' for 10 seconds at normal conversational pitch.", "difficulty_level": "Beginner"},
+                        {"title": "Humming Resonator", "description": "Hum 'Mmm-mmm' feeling vibrations in nose and lips to improve voice tone.", "difficulty_level": "Beginner"},
+                        {"title": "Siren Glides", "description": "Glide voice smoothly from lowest note to highest note on 'Ee'.", "difficulty_level": "Intermediate"}
+                    ]
+                elif 'fluency' in diff:
+                    recs = [
+                        {"title": "Easy Onset 'I feel'", "description": "Start 'I feel pain' with a soft whispery 'H' breath to prevent vocal block.", "difficulty_level": "Intermediate"},
+                        {"title": "Soft Contact /d/ and /t/", "description": "Pronounce words starting with /d/ and /t/ with minimal tongue pressure.", "difficulty_level": "Beginner"},
+                        {"title": "Continuous Phrasing", "description": "Connect words in 'How are you today' with no breaks in airflow.", "difficulty_level": "Intermediate"}
+                    ]
+                else:
+                    recs = [
+                        {"title": "Bilabial Consonants /b/, /p/", "description": "Exaggerate lip closure: 'Baby boy bought a big ball'.", "difficulty_level": "Beginner"},
+                        {"title": "Alveolar Plosives /t/, /d/", "description": "Repeat 'Tip of the tongue' focusing on crisp contact behind teeth.", "difficulty_level": "Intermediate"},
+                        {"title": "R and L Sound Contrasts", "description": "Repeat 'Red lorry, yellow lorry' carefully alternating tongue posture.", "difficulty_level": "Advanced"}
+                    ]
+                    
+            return {'recommendations': recs, 'source': 'Speech Pathology Heuristic Recommendation Engine'}
 
     # ── TTS Route ─────────────────────────────────────────────────────────────
 

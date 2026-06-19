@@ -142,8 +142,8 @@ export const AudioPreprocessingService = {
         // SPEECH-IMPAIRED INCLUSIVE THRESHOLD:
         // Model is fine-tuned on dysarthric speech, so we keep this lenient.
         // Dysarthric voices are naturally quieter and more irregular.
-        // Peak > -42dB catches quiet/impaired speech while blocking silence (-55dB+).
-        // The hallucination blocklist + model's own no_speech_threshold handle noise.
-        return peak > -42 && average > -52;
+        // To reduce Whisper background noise hallucinations, we increase strictness further
+        // while remaining accessible for soft-spoken users.
+        return peak > -32 && average > -45;
     }
 };

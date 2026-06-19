@@ -3,7 +3,7 @@
  * ENHANCED ASR SERVICE (Powered by Whisper)
  * ==========================================
  * Uses local Whisper models via FastAPI backend:
- * - GiftMark/akan-whisper-model for Twi/Akan
+ * - dennis-9/whisper-small_Akan_finetuned_v2 for Twi/Akan
  * - OpenAI Whisper for English
  * - Real-time transcription with auto language detection
  * - Confidence scoring with detailed metrics
@@ -40,7 +40,7 @@ export const ASRService = {
             const isOnline = await checkOnlineStatus();
             if (!isOnline) {
                 console.log('[ASR Service] Offline - Using Local Dictionary Matcher');
-                
+
                 const fallbackPhrases: Record<string, string[]> = {
                     'twi': ['Ma me nsuo', 'Ma me aduane', 'Mepɛ aduro', 'Mepɛ sɛ meda', 'Frɛ boafoɔ'],
                     'en': ['Give me water', 'Give me food', 'Call my family', 'Give me medicine', 'I am hungry'],
@@ -105,7 +105,7 @@ export const ASRService = {
             });
 
             const data = await response.json();
-            
+
             // DEBUG: See what the backend is actually sending
             console.log(`[ASR Debug] Raw data keys: ${Object.keys(data).join(', ')}`);
             if (data.segments && data.segments[0]) {
@@ -131,16 +131,27 @@ export const ASRService = {
 
             // Aggressive Hallucination Filter for Fine-Tuned Whisper Audio Silence
             const hallucinations = [
-                "Mmarima.", 
-                "Wɔredidi.", 
-                "Ɔbarima bi reyɛ adwuma.", 
-                "Wɔnom dware nsuo mu.", 
-                "Nnipa bebree na ɔmo gyina hɔ.",
-                "你", 
-                "You"
+                "mmarima", "wɔredidi", "ɔbarima bi reyɛ adwuma",
+                "wɔnom dware nsuo mu", "nnipa bebree na ɔmo gyina hɔ",
+                "你", "you", "lantikah", "anay du",
+                "thank you", "thanks", "okay",
+                "nnipa bebree na ɔmo gyina hɔ ɛnna ɔmo ɛrehwɛ ɔmo",
+                "nipa bebree na ɔmo gyina hɔ",
+                "wɔnom gyina hɔ",
+                "ɔmoayɛ no",
+                "kwan no mu",
+                "ah", "ahem", "go ahead", "shibuya station"
             ];
-            if (hallucinations.includes(cleanText) || hallucinations.some(h => cleanText === h.replace('.', ''))) {
-                console.log(`[ASR Hallucination Filter] Removed silent static hallucination: ${cleanText}`);
+            const noPunctuationText = cleanText.toLowerCase().replace(/[.,!?¿¡]/g, '').trim();
+            const hasAsianChars = /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\uFAD9\uFF66-\uFF9F]/.test(cleanText);
+
+            if (
+                hasAsianChars ||
+                noPunctuationText.length < 2 ||
+                hallucinations.includes(noPunctuationText) ||
+                hallucinations.some(h => noPunctuationText === h || noPunctuationText.startsWith(h + " "))
+            ) {
+                console.log(`[ASR Hallucination Filter] Removed silent static hallucination: "${cleanText}"`);
                 cleanText = "";
             }
 

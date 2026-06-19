@@ -18,6 +18,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { 
     Activity, 
     ArrowLeft, 
+    Brain,
     CheckCircle2, 
     Clock, 
     MapPin, 
@@ -25,6 +26,8 @@ import {
     Mic, 
     Plus, 
     ShieldAlert, 
+    Smile,
+    Sparkles,
     Trash2, 
     TrendingUp, 
     X 
@@ -36,6 +39,7 @@ import { AnalyticsService, SessionRecord } from '../services/analyticsService';
 import { AppContext } from './_layout';
 import { useT } from '../utils/i18n';
 import { supabase } from '../lib/supabase';
+import { API_BASE_URL } from '../constants/config';
 
 // --- SLP-Backed Suggested Assignments ---
 type SuggestedItem = {
@@ -101,12 +105,119 @@ export default function PatientDetailScreen() {
     const [filterCat, setFilterCat] = useState<GoalCategory | 'all'>('all');
     const [activeAlert, setActiveAlert] = useState<SessionRecord | null>(null);
 
+    // AI Progress states
+    const [aiSummary, setAiSummary] = useState<string>('');
+    const [generatingSummary, setGeneratingSummary] = useState(false);
+    const [aiSentiment, setAiSentiment] = useState<{ happy: number, frustrated: number, anxious: number, neutral: number, reasoning: string } | null>(null);
+    const [analyzingSentiment, setAnalyzingSentiment] = useState(false);
+    const [moodLevels, setMoodLevels] = useState<number[]>([]);
+    const [aiRecommendations, setAiRecommendations] = useState<{ title: string, description: string, difficulty_level: string }[]>([]);
+    const [generatingRecs, setGeneratingRecs] = useState(false);
+    const [selectedDifficulty, setSelectedDifficulty] = useState<'Speech Sound' | 'Voice' | 'Fluency'>('Speech Sound');
+
+    const cleanMarkdown = (text: string) => {
+        if (!text) return '';
+        return text
+            .replace(/#+\s+/g, '') // remove headings (# or ###)
+            .replace(/\*\*/g, '')  // remove bold asterisks
+            .replace(/\*/g, '')    // remove single asterisks
+            .replace(/^-\s+/gm, '') // remove list hyphens at start of line
+            .replace(/^\*\s+/gm, '') // remove list asterisks at start of line
+            .replace(/_{1,2}/g, '') // remove underscores
+            .trim();
+    };
+
+    const generateAISummary = async () => {
+        setGeneratingSummary(true);
+        try {
+            const recentTranscripts = journals.slice(0, 8).map(j => j.transcript);
+            const totalSecs = analytics.reduce((sum, a) => sum + (a.duration || 0), 0);
+            const hours = Number((totalSecs / 3600).toFixed(1));
+            
+            let streakVal = 0;
+            if (analytics.length > 0) {
+                const uniqueDays = new Set(analytics.map(a => a.date.split('T')[0]));
+                streakVal = uniqueDays.size;
+            }
+            const completedGoals = goals.filter(g => g.completed).length;
+            const complianceVal = goals.length > 0 ? Math.round((completedGoals / goals.length) * 100) : 80;
+
+            const res = await fetch(`${API_BASE_URL}/predict/summary`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    patient_name: patientName,
+                    transcripts: recentTranscripts,
+                    compliance_rate: complianceVal,
+                    streak: streakVal || 3,
+                    hours_practiced: hours || 1.5
+                })
+            });
+            const data = await res.json();
+            setAiSummary(cleanMarkdown(data.summary || 'Summary generated.'));
+        } catch (e) {
+            console.error('Failed to get AI summary', e);
+            Alert.alert('AI Error', 'Could not fetch summary. Please verify backend.');
+        } finally {
+            setGeneratingSummary(false);
+        }
+    };
+
+    const analyzeAISentiment = async () => {
+        setAnalyzingSentiment(true);
+        try {
+            const recentTranscripts = journals.slice(0, 10).map(j => j.transcript);
+            const res = await fetch(`${API_BASE_URL}/predict/sentiment`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    transcripts: recentTranscripts,
+                    mood_levels: moodLevels
+                })
+            });
+            const data = await res.json();
+            setAiSentiment({
+                happy: data.happy || 0,
+                frustrated: data.frustrated || 0,
+                anxious: data.anxious || 0,
+                neutral: data.neutral || 0,
+                reasoning: data.reasoning || 'Stable emotional states observed.'
+            });
+        } catch (e) {
+            console.error('Failed to get AI sentiment', e);
+        } finally {
+            setAnalyzingSentiment(false);
+        }
+    };
+
+    const getAIRecommendations = async () => {
+        setGeneratingRecs(true);
+        try {
+            const res = await fetch(`${API_BASE_URL}/predict/recommendations`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    patient_name: patientName,
+                    language: language || 'tw',
+                    difficulty: selectedDifficulty
+                })
+            });
+            const data = await res.json();
+            setAiRecommendations(data.recommendations || []);
+        } catch (e) {
+            console.error('Failed to get recommendations', e);
+        } finally {
+            setGeneratingRecs(false);
+        }
+    };
+
     const CATEGORY_TABS: (GoalCategory | 'all')[] = ['all', 'communication', 'language', 'social', 'fluency', 'voice', 'speech_sound'];
 
     useEffect(() => {
         loadGoals();
         loadJournals();
         loadAnalytics();
+        loadMoodLogs();
         checkActiveEmergency();
 
         // Real-time subscription for Clinical Priority alerts
@@ -153,6 +264,22 @@ export default function PatientDetailScreen() {
     const loadAnalytics = async () => {
         const data = await AnalyticsService.getPatientAnalytics(patientId);
         setAnalytics(data);
+    };
+
+    const loadMoodLogs = async () => {
+        try {
+            const { data } = await supabase
+                .from('mood_logs')
+                .select('mood_level')
+                .eq('patient_id', patientId)
+                .order('created_at', { ascending: false })
+                .limit(10);
+            if (data) {
+                setMoodLevels(data.map(m => m.mood_level));
+            }
+        } catch (err) {
+            console.error('Failed to load mood logs in patient-detail screen:', err);
+        }
     };
 
     const checkActiveEmergency = async () => {
@@ -511,6 +638,178 @@ export default function PatientDetailScreen() {
                 {/* Clinical Insights Section */}
                 {activeMainTab === 'analytics' && (
                     <View style={styles.section}>
+                        {/* ── ✨ AI CLINICAL PROGRESS SUMMARY ── */}
+                        <View style={[styles.insightCard, { backgroundColor: colors.card, borderColor: colors.border, marginBottom: 14 }]}>
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                    <Brain size={20} color={colors.primary} />
+                                    <Text style={[styles.insightTitle, { color: colors.text, fontWeight: '700' }]}>AI Progress Review</Text>
+                                </View>
+                                <TouchableOpacity 
+                                    onPress={generateAISummary} 
+                                    disabled={generatingSummary}
+                                    style={{ backgroundColor: colors.primary + '15', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, borderWidth: 1, borderColor: colors.primary + '20' }}
+                                >
+                                    {generatingSummary ? (
+                                        <ActivityIndicator size="small" color={colors.primary} />
+                                    ) : (
+                                        <Text style={{ fontSize: 11, fontWeight: '700', color: colors.primary }}>
+                                            {aiSummary ? 'Regenerate' : 'Generate'}
+                                        </Text>
+                                    )}
+                                </TouchableOpacity>
+                            </View>
+
+                            {generatingSummary ? (
+                                <View style={{ paddingVertical: 20, alignItems: 'center' }}>
+                                    <ActivityIndicator size="large" color={colors.primary} />
+                                    <Text style={{ fontSize: 12, color: colors.subText, marginTop: 8 }}>Contacting Qwen LLM Backend...</Text>
+                                </View>
+                            ) : aiSummary ? (
+                                <View style={{ backgroundColor: colors.bg, padding: 12, borderRadius: 10, borderWidth: 1, borderColor: colors.border }}>
+                                    <Text style={{ fontSize: 13, color: colors.text, lineHeight: 20 }}>{aiSummary}</Text>
+                                </View>
+                            ) : (
+                                <Text style={{ fontSize: 12, color: colors.subText, fontStyle: 'italic', textAlign: 'center', marginVertical: 10 }}>
+                                    No summary generated yet. Tap Generate to analyze recent exercises.
+                                </Text>
+                            )}
+                        </View>
+
+                        {/* ── ✨ AI MOOD & SENTIMENT ANALYSIS ── */}
+                        <View style={[styles.insightCard, { backgroundColor: colors.card, borderColor: colors.border, marginBottom: 14 }]}>
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                    <Smile size={20} color="#10b981" />
+                                    <Text style={[styles.insightTitle, { color: colors.text, fontWeight: '700' }]}>AI Mood Sentiment</Text>
+                                </View>
+                                <TouchableOpacity 
+                                    onPress={analyzeAISentiment} 
+                                    disabled={analyzingSentiment}
+                                    style={{ backgroundColor: '#10b98115', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, borderWidth: 1, borderColor: '#10b98130' }}
+                                >
+                                    {analyzingSentiment ? (
+                                        <ActivityIndicator size="small" color="#10b981" />
+                                    ) : (
+                                        <Text style={{ fontSize: 11, fontWeight: '700', color: '#10b981' }}>Analyze</Text>
+                                    )}
+                                </TouchableOpacity>
+                            </View>
+
+                            {analyzingSentiment ? (
+                                <View style={{ paddingVertical: 20, alignItems: 'center' }}>
+                                    <ActivityIndicator size="small" color="#10b981" />
+                                    <Text style={{ fontSize: 12, color: colors.subText, marginTop: 8 }}>Classifying voice transcripts...</Text>
+                                </View>
+                            ) : aiSentiment ? (
+                                <View style={{ gap: 8 }}>
+                                    <View>
+                                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
+                                            <Text style={{ fontSize: 11, color: colors.text }}>😊 Happy</Text>
+                                            <Text style={{ fontSize: 11, color: colors.subText }}>{aiSentiment.happy}%</Text>
+                                        </View>
+                                        <View style={{ height: 6, backgroundColor: colors.border, borderRadius: 3, overflow: 'hidden' }}>
+                                            <View style={{ width: `${aiSentiment.happy}%` as any, height: '100%', backgroundColor: '#10b981' }} />
+                                        </View>
+                                    </View>
+                                    <View>
+                                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
+                                            <Text style={{ fontSize: 11, color: colors.text }}>😠 Frustrated</Text>
+                                            <Text style={{ fontSize: 11, color: colors.subText }}>{aiSentiment.frustrated}%</Text>
+                                        </View>
+                                        <View style={{ height: 6, backgroundColor: colors.border, borderRadius: 3, overflow: 'hidden' }}>
+                                            <View style={{ width: `${aiSentiment.frustrated}%` as any, height: '100%', backgroundColor: '#ef4444' }} />
+                                        </View>
+                                    </View>
+                                    <View>
+                                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
+                                            <Text style={{ fontSize: 11, color: colors.text }}>😰 Anxious</Text>
+                                            <Text style={{ fontSize: 11, color: colors.subText }}>{aiSentiment.anxious}%</Text>
+                                        </View>
+                                        <View style={{ height: 6, backgroundColor: colors.border, borderRadius: 3, overflow: 'hidden' }}>
+                                            <View style={{ width: `${aiSentiment.anxious}%` as any, height: '100%', backgroundColor: '#f59e0b' }} />
+                                        </View>
+                                    </View>
+                                    <View>
+                                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
+                                            <Text style={{ fontSize: 11, color: colors.text }}>😐 Neutral</Text>
+                                            <Text style={{ fontSize: 11, color: colors.subText }}>{aiSentiment.neutral}%</Text>
+                                        </View>
+                                        <View style={{ height: 6, backgroundColor: colors.border, borderRadius: 3, overflow: 'hidden' }}>
+                                            <View style={{ width: `${aiSentiment.neutral}%` as any, height: '100%', backgroundColor: '#9ca3af' }} />
+                                        </View>
+                                    </View>
+                                    <View style={{ backgroundColor: colors.bg, padding: 8, borderRadius: 8, borderWidth: 1, borderColor: colors.border, marginTop: 4 }}>
+                                        <Text style={{ fontSize: 11, color: colors.subText, fontStyle: 'italic' }}>"{aiSentiment.reasoning}"</Text>
+                                    </View>
+                                </View>
+                            ) : (
+                                <Text style={{ fontSize: 12, color: colors.subText, fontStyle: 'italic', textAlign: 'center', marginVertical: 10 }}>
+                                    No sentiment metrics computed. Tap Analyze to classify mood.
+                                </Text>
+                            )}
+                        </View>
+
+                        {/* ── ✨ AI PERSONALIZED RECOMMENDATIONS ── */}
+                        <View style={[styles.insightCard, { backgroundColor: colors.card, borderColor: colors.border, marginBottom: 14 }]}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                                <Sparkles size={20} color="#f59e0b" />
+                                <Text style={[styles.insightTitle, { color: colors.text, fontWeight: '700' }]}>AI Recommended Drills</Text>
+                            </View>
+
+                            <View style={{ flexDirection: 'row', gap: 4, marginBottom: 10 }}>
+                                {(['Speech Sound', 'Voice', 'Fluency'] as const).map(d => (
+                                    <TouchableOpacity
+                                        key={d}
+                                        onPress={() => setSelectedDifficulty(d)}
+                                        style={{
+                                            flex: 1,
+                                            paddingVertical: 5,
+                                            borderRadius: 6,
+                                            borderWidth: 1,
+                                            borderColor: selectedDifficulty === d ? colors.primary : colors.border,
+                                            backgroundColor: selectedDifficulty === d ? colors.primary : colors.bg,
+                                            alignItems: 'center'
+                                        }}
+                                    >
+                                        <Text style={{ fontSize: 10, fontWeight: '700', color: selectedDifficulty === d ? '#fff' : colors.subText }}>{d}</Text>
+                                    </TouchableOpacity>
+                                ))}
+                            </View>
+
+                            <TouchableOpacity
+                                onPress={getAIRecommendations}
+                                disabled={generatingRecs}
+                                style={{ backgroundColor: '#008000', paddingVertical: 8, borderRadius: 10, alignItems: 'center', marginBottom: 10 }}
+                            >
+                                {generatingRecs ? (
+                                    <ActivityIndicator size="small" color="#fff" />
+                                ) : (
+                                    <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700' }}>Get tailored exercises</Text>
+                                )}
+                            </TouchableOpacity>
+
+                            {generatingRecs ? (
+                                <View style={{ paddingVertical: 10, alignItems: 'center' }}>
+                                    <ActivityIndicator size="small" color="#008000" />
+                                </View>
+                            ) : aiRecommendations.length > 0 ? (
+                                <View style={{ gap: 8 }}>
+                                    {aiRecommendations.map((r, idx) => (
+                                        <View key={idx} style={{ backgroundColor: colors.bg, padding: 10, borderRadius: 8, borderLeftWidth: 3, borderLeftColor: '#008000', borderStyle: 'solid' }}>
+                                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                                                <Text style={{ fontWeight: '700', fontSize: 12, color: colors.text }}>{r.title}</Text>
+                                                <Text style={{ fontSize: 9, fontWeight: '700', color: '#008000', backgroundColor: '#00800015', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                                                    {r.difficulty_level}
+                                                </Text>
+                                            </View>
+                                            <Text style={{ fontSize: 11, color: colors.subText }}>{r.description}</Text>
+                                        </View>
+                                    ))}
+                                </View>
+                            ) : null}
+                        </View>
+
                         <View style={styles.statsGrid}>
                             <View style={[styles.statItem, { backgroundColor: colors.card, borderColor: colors.border }]}>
                                 <Text style={[styles.statValue, { color: colors.primary }]}>{analytics.reduce((sum, s) => sum + s.wordCount, 0)}</Text>

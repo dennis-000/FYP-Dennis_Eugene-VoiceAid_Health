@@ -203,7 +203,11 @@ export default function PatientsPage() {
                             </thead>
                             <tbody className="divide-y divide-gray-50">
                                 {filtered.map(p => (
-                                    <tr key={p.id} className="hover:bg-[#CC0000]/5 transition-colors">
+                                    <tr 
+                                        key={p.id} 
+                                        onClick={() => router.push(`/patients/${p.id}`)}
+                                        className="hover:bg-[#CC0000]/5 transition-colors cursor-pointer"
+                                    >
                                         <td className="px-6 py-4">
                                             <div className="flex items-center gap-3">
                                                 <div className="relative">

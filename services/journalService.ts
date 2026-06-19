@@ -1,4 +1,4 @@
-import * as FileSystem from 'expo-file-system/src/legacy';
+import * as FileSystem from 'expo-file-system/legacy';
 import { supabase } from '../lib/supabase';
 
 export interface VoiceJournal {
@@ -46,7 +46,7 @@ export const JournalService = {
 
             // Read the file as base64, then convert to Uint8Array for SDK upload
             const base64 = await FileSystem.readAsStringAsync(localUri, {
-                encoding: FileSystem.EncodingType.Base64,
+                encoding: 'base64',
             });
 
             // Convert base64 → binary Uint8Array
