@@ -2,18 +2,22 @@ const { getDefaultConfig } = require('expo/metro-config');
 
 const config = getDefaultConfig(__dirname);
 
-// Define directories to exclude from Metro's file watcher and bundle resolution
 const customExclusions = [
-  // Exclude Next.js web application node_modules and builds
-  /[/\\]admin-dashboard[/\\]node_modules[/\\]/,
-  /[/\\]admin-dashboard[/\\]\.next[/\\]/,
+  // Exclude Next.js web application entirely
+  /[/\\]admin-dashboard[/\\]/,
   
-  // Exclude Python virtual environment
+  // Exclude Python backend and virtual environment entirely
+  /[/\\]backend[/\\]/,
   /[/\\]backend-env[/\\]/,
   
   // Exclude colab and dataset scripts
   /[/\\]colab[/\\]/,
-  /[/\\]dataset[/\\]/
+  /[/\\]dataset[/\\]/,
+  
+  // Exclude docs, database migrations, and raw resources
+  /[/\\]docs[/\\]/,
+  /[/\\]supabase[/\\]/,
+  /[/\\]resources[/\\]/
 ];
 
 if (Array.isArray(config.resolver.blockList)) {
