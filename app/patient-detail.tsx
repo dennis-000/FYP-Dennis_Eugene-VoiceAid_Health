@@ -92,7 +92,7 @@ const CATEGORY_COLORS: Record<GoalCategory, string> = {
 export default function PatientDetailScreen() {
     const router = useRouter();
     const params = useLocalSearchParams();
-    const { colors, language } = useContext(AppContext);
+    const { colors, language, themeMode } = useContext(AppContext);
     const { therapistProfile } = useAuth();
     const tr = useT(language as any);
     const SUGGESTIONS = getSuggestions(tr);
@@ -131,6 +131,22 @@ export default function PatientDetailScreen() {
     const [aiRecommendations, setAiRecommendations] = useState<{ title: string, description: string, difficulty_level: string }[]>([]);
     const [generatingRecs, setGeneratingRecs] = useState(false);
     const [selectedDifficulty, setSelectedDifficulty] = useState<'Speech Sound' | 'Voice' | 'Fluency'>('Speech Sound');
+
+    // AI Voice Journal states
+    const [aiJournalAnalysis, setAiJournalAnalysis] = useState<string>('');
+    const [analyzingJournal, setAnalyzingJournal] = useState(false);
+
+    const getCardStyles = (index: number, isDark: boolean) => {
+        const lightBgs = ['#eff6ff', '#ecfdf5', '#f5f3ff'];
+        const darkBgs = ['rgba(59, 130, 246, 0.15)', 'rgba(16, 185, 129, 0.15)', 'rgba(139, 92, 246, 0.15)'];
+        const borderColors = ['#3b82f6', '#10b981', '#8b5cf6'];
+        const textColors = [isDark ? '#93c5fd' : '#1e3a8a', isDark ? '#6ee7b7' : '#065f46', isDark ? '#c084fc' : '#4c1d95'];
+        return {
+            bg: isDark ? darkBgs[index] : lightBgs[index],
+            border: borderColors[index],
+            text: textColors[index]
+        };
+    };
 
     const cleanMarkdown = (text: string) => {
         if (!text) return '';
@@ -210,6 +226,31 @@ export default function PatientDetailScreen() {
             Alert.alert('AI Error', 'Could not fetch summary. Please verify backend.');
         } finally {
             setGeneratingSummary(false);
+        }
+    };
+
+    const generateAIJournalAnalysis = async () => {
+        if (journals.length === 0) {
+            Alert.alert('No Journals', 'Patient has no journal entries to analyze.');
+            return;
+        }
+        setAnalyzingJournal(true);
+        try {
+            const res = await fetch(`${API_BASE_URL}/predict/journal_analysis`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    patient_name: patientName,
+                    journals: journals.map(j => j.transcript)
+                })
+            });
+            const data = await res.json();
+            setAiJournalAnalysis(cleanMarkdown(data.analysis || 'No analysis generated.'));
+        } catch (e) {
+            console.error('Failed to get AI Journal analysis', e);
+            Alert.alert('AI Error', 'Could not fetch journal analysis.');
+        } finally {
+            setAnalyzingJournal(false);
         }
     };
 
@@ -713,6 +754,82 @@ export default function PatientDetailScreen() {
                             <TrendingUp size={32} color={colors.primary} />
                         </View>
 
+                        {/* ── ✨ AI VOICE JOURNAL ANALYSIS ── */}
+                        <View style={[styles.insightCard, { backgroundColor: colors.card, borderColor: colors.border, marginBottom: 14 }]}>
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                    <Brain size={20} color={colors.primary} />
+                                    <Text style={[styles.insightTitle, { color: colors.text, fontWeight: '700' }]}>AI Voice Journal Insights</Text>
+                                </View>
+                                <TouchableOpacity 
+                                    onPress={generateAIJournalAnalysis} 
+                                    disabled={analyzingJournal}
+                                    style={{ backgroundColor: colors.primary + '15', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, borderWidth: 1, borderColor: colors.primary + '20' }}
+                                >
+                                    {analyzingJournal ? (
+                                        <ActivityIndicator size="small" color={colors.primary} />
+                                    ) : (
+                                        <Text style={{ fontSize: 11, fontWeight: '700', color: colors.primary }}>
+                                            {aiJournalAnalysis ? 'Regenerate' : 'Generate'}
+                                        </Text>
+                                    )}
+                                </TouchableOpacity>
+                            </View>
+
+                            {analyzingJournal ? (
+                                <View style={{ paddingVertical: 20, alignItems: 'center' }}>
+                                    <ActivityIndicator size="large" color={colors.primary} />
+                                    <Text style={{ fontSize: 12, color: colors.subText, marginTop: 8 }}>Analyzing vocal journals...</Text>
+                                </View>
+                            ) : aiJournalAnalysis ? (
+                                <View style={{ gap: 10 }}>
+                                    {(() => {
+                                        const paragraphs = aiJournalAnalysis.split(/\n\s*\n/).filter(p => p.trim().length > 0);
+                                        const titles = [
+                                            "Spoken Themes & Cognitive Outlook",
+                                            "Clinical Rehabilitation Tips",
+                                            "Caregiver Coordination Guidance"
+                                        ];
+                                        const icons = [
+                                            <Brain size={16} color={themeMode === 'dark' ? '#93c5fd' : '#1e3a8a'} />,
+                                            <Activity size={16} color={themeMode === 'dark' ? '#6ee7b7' : '#065f46'} />,
+                                            <Sparkles size={16} color={themeMode === 'dark' ? '#c084fc' : '#4c1d95'} />
+                                        ];
+                                        
+                                        return paragraphs.map((paragraph, index) => {
+                                            const cardStyle = getCardStyles(index % 3, themeMode === 'dark');
+                                            const cleanText = paragraph.replace(/^(Spoken Themes & Cognitive Outlook|Clinical Rehabilitation Tips|Caregiver Coordination Guidance):\s*/i, '');
+                                            return (
+                                                <View 
+                                                    key={index} 
+                                                    style={{ 
+                                                        backgroundColor: cardStyle.bg, 
+                                                        padding: 12, 
+                                                        borderRadius: 10, 
+                                                        borderLeftWidth: 4, 
+                                                        borderLeftColor: cardStyle.border, 
+                                                        borderStyle: 'solid' 
+                                                    }}
+                                                >
+                                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                                                        {icons[index % 3]}
+                                                        <Text style={{ fontSize: 12, fontWeight: '700', color: cardStyle.text }}>
+                                                            {titles[index % 3] || 'AI Insight'}
+                                                        </Text>
+                                                    </View>
+                                                    <Text style={{ fontSize: 13, color: colors.text, lineHeight: 18 }}>{cleanText}</Text>
+                                                </View>
+                                            );
+                                        });
+                                    })()}
+                                </View>
+                            ) : (
+                                <Text style={{ fontSize: 12, color: colors.subText, fontStyle: 'italic', textAlign: 'center', marginVertical: 10 }}>
+                                    No journal analysis generated yet. Tap Generate to run speech-journal analysis.
+                                </Text>
+                            )}
+                        </View>
+
                         <Text style={[styles.sectionTitle, { color: colors.text, marginBottom: 12 }]}>Journal History</Text>
 
                         {journals.length === 0 ? (
@@ -775,8 +892,46 @@ export default function PatientDetailScreen() {
                                     <Text style={{ fontSize: 12, color: colors.subText, marginTop: 8 }}>Contacting Qwen LLM Backend...</Text>
                                 </View>
                             ) : aiSummary ? (
-                                <View style={{ backgroundColor: colors.bg, padding: 12, borderRadius: 10, borderWidth: 1, borderColor: colors.border }}>
-                                    <Text style={{ fontSize: 13, color: colors.text, lineHeight: 20 }}>{aiSummary}</Text>
+                                <View style={{ gap: 10 }}>
+                                    {(() => {
+                                        const paragraphs = aiSummary.split(/\n\s*\n/).filter(p => p.trim().length > 0);
+                                        const titles = [
+                                            "Patient Performance & Compliance",
+                                            "Journal & Sentiment Analysis",
+                                            "Brainstormed Therapist Improvement Guide"
+                                        ];
+                                        const icons = [
+                                            <Activity size={16} color={themeMode === 'dark' ? '#93c5fd' : '#1e3a8a'} />,
+                                            <Smile size={16} color={themeMode === 'dark' ? '#6ee7b7' : '#065f46'} />,
+                                            <Sparkles size={16} color={themeMode === 'dark' ? '#c084fc' : '#4c1d95'} />
+                                        ];
+                                        
+                                        return paragraphs.map((paragraph, index) => {
+                                            const cardStyle = getCardStyles(index % 3, themeMode === 'dark');
+                                            const cleanText = paragraph.replace(/^(Patient Performance Summary|Journal & Sentiment Analysis|Brainstormed Therapist Improvement Guide|Therapist Guidance & Brainstormed Tips):\s*/i, '');
+                                            return (
+                                                <View 
+                                                    key={index} 
+                                                    style={{ 
+                                                        backgroundColor: cardStyle.bg, 
+                                                        padding: 12, 
+                                                        borderRadius: 10, 
+                                                        borderLeftWidth: 4, 
+                                                        borderLeftColor: cardStyle.border, 
+                                                        borderStyle: 'solid' 
+                                                    }}
+                                                >
+                                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                                                        {icons[index % 3]}
+                                                        <Text style={{ fontSize: 12, fontWeight: '700', color: cardStyle.text }}>
+                                                            {titles[index % 3] || 'AI Review'}
+                                                        </Text>
+                                                    </View>
+                                                    <Text style={{ fontSize: 13, color: colors.text, lineHeight: 18 }}>{cleanText}</Text>
+                                                </View>
+                                            );
+                                        });
+                                    })()}
                                 </View>
                             ) : (
                                 <Text style={{ fontSize: 12, color: colors.subText, fontStyle: 'italic', textAlign: 'center', marginVertical: 10 }}>

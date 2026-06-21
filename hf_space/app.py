@@ -631,6 +631,69 @@ async def predict_recommendations(req: RecommendationRequest):
                 
         return {'recommendations': recs, 'source': 'Speech Pathology Heuristic Recommendation Engine'}
 
+
+class JournalAnalysisRequest(BaseModel):
+    patient_name: str
+    journals: List[str]
+
+@backend.post('/predict/journal_analysis')
+async def predict_journal_analysis(req: JournalAnalysisRequest):
+    if not req.journals:
+        return {
+            'analysis': "No voice journal entries found to analyze. Advise the patient to record their first journal entry to start receiving clinical insights.",
+            'source': 'Deterministic Heuristic Engine'
+        }
+        
+    journals_str = "\n".join([f'- "{j}"' for j in req.journals])
+    prompt = (
+        f"You are a clinical speech-language pathologist and rehabilitation AI.\n"
+        f"Analyze these recent voice journal transcripts recorded by patient '{req.patient_name}':\n"
+        f"{journals_str}\n\n"
+        f"Write a clinical analysis of their journal entries in 3 short, professional paragraphs:\n"
+        f"Paragraph 1: SPOKEN THEMES & COGNITIVE OUTLOOK. Describe what the patient is talking about (daily routines, concerns, pain, recovery progress) and what their language reveals about their mental state, mood, and cognitive clarity.\n"
+        f"Paragraph 2: CLINICAL REHABILITATION TIPS. Recommend specific breathing, voice, or articulation exercises (e.g., easy-onset phonation, pacing control, diaphragmatic breathing) based on the fatigue or discomfort mentioned.\n"
+        f"Paragraph 3: CAREGIVER COORDINATION GUIDANCE. Give practical suggestions on how the family or caregiver can support the patient in their home environment based on what they expressed."
+        f"\n\nDo NOT use markdown bold, list bullets, hashes, or list markers. Return ONLY clean, readable plain text paragraphs."
+    )
+    
+    try:
+        analysis = await asyncio.to_thread(query_hf_llm, prompt, max_tokens=350, temperature=0.3)
+        analysis = re.sub(r'\*+', '', analysis)
+        analysis = re.sub(r'#+', '', analysis)
+        analysis = re.sub(r'^- ', '', analysis, flags=re.MULTILINE)
+        return {'analysis': analysis.strip(), 'source': 'AI (HuggingFace Serverless LLM)'}
+    except Exception as e:
+        print(f"[AI Backend] Fallback triggered for Journal Analysis: {e}")
+        
+        # Heuristic fallback based on journal content
+        pain_words = ['pain', 'hurt', 'sad', 'bad', 'tired', 'cry', 'help', 'emergency', 'stop', 'difficult', 'stuck', 'ɛyaw', 'yare']
+        twi_words = ['nsuo', 'kasa', 'paa', 'twi', 'ɛyɛ', 'mami', 'dodo', 'yare', 'medaase', 'mepɛ', 'pa']
+        
+        has_pain = any(any(w in j.lower() for w in pain_words) for j in req.journals)
+        has_twi = any(any(w in j.lower() for w in twi_words) for j in req.journals)
+        
+        paragraph1 = f"Spoken Themes & Cognitive Outlook: Analysis of {len(req.journals)} voice journal recordings indicates that {req.patient_name} is actively using their voice board. "
+        if has_pain:
+            paragraph1 += "The transcripts express feelings of fatigue, pain, or difficulty with current communication targets. This suggests increased cognitive load or physical discomfort during daily rehabilitation activities."
+        else:
+            paragraph1 += "The verbal logs show a stable emotional baseline. Topics relate to standard daily activities, indicating steady cognitive clarity and willingness to communicate."
+            
+        paragraph2 = "Clinical Rehabilitation Tips: "
+        if has_pain:
+            paragraph2 += "We recommend introducing gentle vocal play and diaphragmatic breath support exercises (such as sustained vowel phonations). Advise the patient to take frequent rest breaks and avoid straining when articulation blocks occur."
+        else:
+            paragraph2 += "Continue progress with current articulation templates. Introduce conversational short-phrase cards to transition the patient from single words to natural pacing."
+            
+        paragraph3 = "Caregiver Coordination Guidance: "
+        if has_twi:
+            paragraph3 += "Caregivers should encourage communication in the patient's preferred Akan Twi dialect. Practice daily check-ins in a quiet room to reduce environmental noise and auditory fatigue."
+        else:
+            paragraph3 += "Ensure the patient feels supported during communication attempts. Allow ample time (10-15 seconds) for them to formulate responses before repeating prompts."
+            
+        analysis_text = f"{paragraph1}\n\n{paragraph2}\n\n{paragraph3}"
+        return {'analysis': analysis_text, 'source': 'Deterministic Clinical Heuristic Analyzer'}
+
+
 # ── Entry Point ───────────────────────────────────────────────────────────────
 # HF Docker Spaces run via uvicorn on port 7860
 

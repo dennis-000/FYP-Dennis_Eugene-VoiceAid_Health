@@ -81,6 +81,10 @@ export default function PatientDetailPage() {
     const [recsSource, setRecsSource] = useState('');
     const [selectedDifficulty, setSelectedDifficulty] = useState<'Speech Sound' | 'Voice' | 'Fluency'>('Speech Sound');
 
+    // AI Voice Journal states
+    const [aiJournalAnalysis, setAiJournalAnalysis] = useState<string>('');
+    const [analyzingJournal, setAnalyzingJournal] = useState(false);
+
     const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://dennis-9-voiceaid-health-backend.hf.space';
 
     const checkAuth = useCallback(async () => {
@@ -365,6 +369,28 @@ export default function PatientDetailPage() {
         }
     };
 
+    const generateJournalAnalysis = async () => {
+        if (!patient) return;
+        if (journals.length === 0) return;
+        setAnalyzingJournal(true);
+        try {
+            const response = await fetch(`${backendUrl}/predict/journal_analysis`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    patient_name: patient.full_name || 'Patient',
+                    journals: journals.map(j => j.transcript)
+                })
+            });
+            const data = await response.json();
+            setAiJournalAnalysis(cleanMarkdown(data.analysis || ''));
+        } catch (e) {
+            console.error('[AI Detail] Failed to get journal analysis', e);
+        } finally {
+            setAnalyzingJournal(false);
+        }
+    };
+
     if (loading) {
         return (
             <div className="min-h-screen flex items-center justify-center">
@@ -532,10 +558,52 @@ export default function PatientDetailPage() {
                             </div>
                         ) : aiSummary ? (
                             <div className="space-y-4">
-                                <div className="p-4 bg-gray-50 border border-gray-100 rounded-2xl text-sm leading-relaxed text-gray-700 font-medium whitespace-pre-line prose prose-sm max-w-none">
-                                    {aiSummary}
+                                <div className="grid grid-cols-1 gap-4">
+                                    {(() => {
+                                        const paragraphs = aiSummary.split(/\n\s*\n/).filter(p => p.trim().length > 0);
+                                        const cardStyles = [
+                                            {
+                                                bg: 'bg-blue-50/40 border-blue-500 hover:bg-blue-50',
+                                                text: 'text-blue-900',
+                                                icon: <Activity className="w-5 h-5 text-blue-600" />,
+                                                title: 'Patient Performance & Compliance'
+                                            },
+                                            {
+                                                bg: 'bg-emerald-50/40 border-emerald-500 hover:bg-emerald-50',
+                                                text: 'text-emerald-900',
+                                                icon: <Smile className="w-5 h-5 text-emerald-600" />,
+                                                title: 'Journal & Sentiment Analysis'
+                                            },
+                                            {
+                                                bg: 'bg-purple-50/40 border-purple-500 hover:bg-purple-50',
+                                                text: 'text-purple-900',
+                                                icon: <Sparkles className="w-5 h-5 text-purple-600" />,
+                                                title: 'Brainstormed Therapist Improvement Guide'
+                                            }
+                                        ];
+                                        return paragraphs.map((paragraph, index) => {
+                                            const style = cardStyles[index % 3];
+                                            const cleanText = paragraph.replace(/^(Patient Performance Summary|Journal & Sentiment Analysis|Brainstormed Therapist Improvement Guide|Therapist Guidance & Brainstormed Tips):\s*/i, '');
+                                            return (
+                                                <div 
+                                                    key={index} 
+                                                    className={`p-5 rounded-2xl border-l-4 border ${style.bg} transition-all duration-200 flex flex-col gap-2 shadow-sm`}
+                                                >
+                                                    <div className="flex items-center gap-2">
+                                                        {style.icon}
+                                                        <h3 className={`text-sm font-bold tracking-tight ${style.text}`}>
+                                                            {style.title}
+                                                        </h3>
+                                                    </div>
+                                                    <p className="text-sm text-gray-700 leading-relaxed font-medium">
+                                                        {cleanText}
+                                                    </p>
+                                                </div>
+                                            );
+                                        });
+                                    })()}
                                 </div>
-                                <div className="flex items-center justify-between text-[10px] text-gray-400 font-semibold px-1">
+                                <div className="flex items-center justify-between text-[10px] text-gray-400 font-semibold px-1 pt-2">
                                     <span>Engine: {summarySource}</span>
                                     <span>Rate: 0.00$ / free tier</span>
                                 </div>
@@ -691,6 +759,87 @@ export default function PatientDetailPage() {
                                 <span className="text-xs bg-gray-50 text-gray-500 font-bold border border-gray-100 px-3 py-1 rounded-xl">
                                     Average: {journals.length > 0 ? Math.round(journals.reduce((sum, j) => sum + (j.wpm || 0), 0) / journals.length) : 0} WPM
                                 </span>
+                            </div>
+
+                            {/* AI Voice Journal Insights Panel */}
+                            <div className="mb-6 p-5 bg-gradient-to-r from-gray-50 to-white border border-gray-100 rounded-2xl relative overflow-hidden">
+                                <div className="flex items-center justify-between mb-4">
+                                    <div className="flex items-center gap-2">
+                                        <Brain size={18} className="text-[#CC0000]" />
+                                        <h3 className="text-sm font-bold text-gray-900">AI Voice Journal Analysis</h3>
+                                    </div>
+                                    <button
+                                        onClick={generateJournalAnalysis}
+                                        disabled={analyzingJournal || journals.length === 0}
+                                        className="flex items-center gap-1.5 px-3 py-1.5 bg-[#CC0000]/10 hover:bg-[#CC0000]/20 text-[#CC0000] text-xs font-bold rounded-lg transition-colors border border-[#CC0000]/20 disabled:opacity-50"
+                                    >
+                                        {analyzingJournal ? (
+                                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                        ) : (
+                                            <RefreshCw className="w-3.5 h-3.5" />
+                                        )}
+                                        {aiJournalAnalysis ? 'Regenerate Analysis' : 'Analyze Voice Journals'}
+                                    </button>
+                                </div>
+
+                                {analyzingJournal ? (
+                                    <div className="py-8 text-center text-gray-400 space-y-3 bg-white rounded-xl border border-gray-50">
+                                        <Loader2 className="w-6 h-6 animate-spin text-[#CC0000] mx-auto" />
+                                        <p className="text-xs font-semibold">Running clinical speech-journal analysis...</p>
+                                    </div>
+                                ) : aiJournalAnalysis ? (
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                        {(() => {
+                                            const paragraphs = aiJournalAnalysis.split(/\n\s*\n/).filter(p => p.trim().length > 0);
+                                            const cardStyles = [
+                                                {
+                                                    bg: 'bg-blue-50/40 border-blue-500 hover:bg-blue-50',
+                                                    text: 'text-blue-900',
+                                                    icon: <Brain className="w-4.5 h-4.5 text-blue-600" />,
+                                                    title: 'Spoken Themes & Cognitive Outlook'
+                                                },
+                                                {
+                                                    bg: 'bg-emerald-50/40 border-emerald-500 hover:bg-emerald-50',
+                                                    text: 'text-emerald-900',
+                                                    icon: <Activity className="w-4.5 h-4.5 text-emerald-600" />,
+                                                    title: 'Clinical Rehabilitation Tips'
+                                                },
+                                                {
+                                                    bg: 'bg-purple-50/40 border-purple-500 hover:bg-purple-50',
+                                                    text: 'text-purple-900',
+                                                    icon: <Sparkles className="w-4.5 h-4.5 text-purple-600" />,
+                                                    title: 'Caregiver Coordination Guidance'
+                                                }
+                                            ];
+                                            return paragraphs.map((paragraph, index) => {
+                                                const style = cardStyles[index % 3];
+                                                const cleanText = paragraph.replace(/^(Spoken Themes & Cognitive Outlook|Clinical Rehabilitation Tips|Caregiver Coordination Guidance):\s*/i, '');
+                                                return (
+                                                    <div 
+                                                        key={index} 
+                                                        className={`p-4 rounded-xl border-l-4 border ${style.bg} transition-all duration-200 flex flex-col gap-2 shadow-sm`}
+                                                    >
+                                                        <div className="flex items-center gap-1.5">
+                                                            {style.icon}
+                                                            <h4 className={`text-xs font-bold tracking-tight ${style.text}`}>
+                                                                {style.title}
+                                                            </h4>
+                                                        </div>
+                                                        <p className="text-xs text-gray-700 leading-relaxed font-semibold">
+                                                            {cleanText}
+                                                        </p>
+                                                    </div>
+                                                );
+                                            });
+                                        })()}
+                                    </div>
+                                ) : (
+                                    <div className="p-4 text-center border border-dashed border-gray-200 rounded-xl text-gray-400 bg-white">
+                                        <Sparkles className="w-8 h-8 text-gray-300 mx-auto mb-1" />
+                                        <p className="text-xs font-semibold">No journal analysis generated yet.</p>
+                                        <p className="text-[11px] text-gray-500">Analyze the patient's voice journals to generate actionable clinical tips and support directives.</p>
+                                    </div>
+                                )}
                             </div>
 
                             {journals.length === 0 ? (
