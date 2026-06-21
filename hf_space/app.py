@@ -295,10 +295,40 @@ class RecommendationRequest(BaseModel):
 
 def query_hf_llm(prompt: str, max_tokens: int = 250, temperature: float = 0.3) -> str:
     """Helper to query Hugging Face Serverless Inference API with fallback models."""
+    import os
+    
+    # Layer 1: Try official Hugging Face SDK client (uses internal routing and HF_ENDPOINT)
+    try:
+        from huggingface_hub import InferenceClient
+        token = os.environ.get("HF_TOKEN") or os.environ.get("HUGGINGFACE_CO_RESOLVE_PROVIDER") or os.environ.get("HF_API_KEY")
+        
+        # Try Qwen model first, fall back to Llama-3.2
+        sdk_models = [
+            "Qwen/Qwen2.5-7B-Instruct",
+            "meta-llama/Llama-3.2-3B-Instruct"
+        ]
+        
+        for model_name in sdk_models:
+            try:
+                client = InferenceClient(model=model_name, token=token)
+                response = client.text_generation(
+                    prompt,
+                    max_new_tokens=max_tokens,
+                    temperature=temperature,
+                    timeout=10
+                )
+                if response and response.strip():
+                    return response.strip()
+            except Exception as e:
+                print(f"[AI Backend] Warning: LLM query failed for {model_name} via SDK client: {e}")
+                continue
+    except Exception as e:
+        print(f"[AI Backend] Warning: Failed to initialize SDK InferenceClient: {e}")
+
+    # Layer 2: Fall back to raw requests library if SDK is unavailable or fails
     import requests
     import json
     
-    # Try Qwen model first, fall back to Llama-3.2 if it fails
     models = [
         "https://api-inference.huggingface.co/models/Qwen/Qwen2.5-7B-Instruct",
         "https://api-inference.huggingface.co/models/meta-llama/Llama-3.2-3B-Instruct"
@@ -336,7 +366,7 @@ def query_hf_llm(prompt: str, max_tokens: int = 250, temperature: float = 0.3) -
             else:
                 print(f"[AI Backend] Warning: LLM query failed for {url} with status {response.status_code}: {response.text}")
         except Exception as e:
-            print(f"[AI Backend] Warning: LLM query failed for {url}: {e}")
+            print(f"[AI Backend] Warning: LLM query failed for {url} via requests: {e}")
             continue
             
     raise RuntimeError("All inference model APIs are unreachable or timed out.")
