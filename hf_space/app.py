@@ -295,7 +295,7 @@ class RecommendationRequest(BaseModel):
 
 def query_hf_llm(prompt: str, max_tokens: int = 250, temperature: float = 0.3) -> str:
     """Helper to query Hugging Face Serverless Inference API with fallback models."""
-    import urllib.request
+    import requests
     import json
     
     # Try Qwen model first, fall back to Llama-3.2 if it fails
@@ -319,13 +319,12 @@ def query_hf_llm(prompt: str, max_tokens: int = 250, temperature: float = 0.3) -
             "return_full_text": False
         }
     }
-    data_bytes = json.dumps(payload).encode("utf-8")
     
     for url in models:
         try:
-            req = urllib.request.Request(url, data=data_bytes, headers=headers, method="POST")
-            with urllib.request.urlopen(req, timeout=10) as response:
-                res_json = json.loads(response.read().decode("utf-8"))
+            response = requests.post(url, json=payload, headers=headers, timeout=10)
+            if response.status_code == 200:
+                res_json = response.json()
                 if isinstance(res_json, list) and len(res_json) > 0:
                     text = res_json[0].get("generated_text", "").strip()
                     if text:
@@ -334,6 +333,8 @@ def query_hf_llm(prompt: str, max_tokens: int = 250, temperature: float = 0.3) -
                     text = res_json.get("generated_text", "").strip()
                     if text:
                         return text
+            else:
+                print(f"[AI Backend] Warning: LLM query failed for {url} with status {response.status_code}: {response.text}")
         except Exception as e:
             print(f"[AI Backend] Warning: LLM query failed for {url}: {e}")
             continue
