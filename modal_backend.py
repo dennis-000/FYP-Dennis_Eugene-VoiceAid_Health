@@ -272,7 +272,7 @@ def fastapi_app():
 
     # ── AI Diagnostics and Therapist Insights (LLM) ──────────────────────────
 
-    from typing import List
+    from typing import List, Optional, Dict, Any
 
     class SummaryRequest(BaseModel):
         patient_name: str
@@ -280,6 +280,8 @@ def fastapi_app():
         compliance_rate: float
         streak: int
         hours_practiced: float
+        struggles: Optional[List[Dict[str, Any]]] = None
+        completed_assignments: Optional[List[Dict[str, Any]]] = None
 
     class SentimentRequest(BaseModel):
         transcripts: List[str]
@@ -341,20 +343,45 @@ def fastapi_app():
     @backend.post('/predict/summary')
     async def predict_summary(req: SummaryRequest):
         transcripts_str = "\n".join([f'- "{t}"' for t in req.transcripts]) if req.transcripts else "No recent speech recordings."
+        
+        struggles_str = ""
+        if req.struggles:
+            struggles_str = "\n".join([
+                f'- {s.get("questTitle", "Exercise")}: {s.get("incorrectAttempts", s.get("attempts", 1))} mistake(s). Detail: {s.get("detail", "Incorrect attempt")}'
+                for s in req.struggles
+            ])
+        else:
+            struggles_str = "No recent struggles or mistakes logged."
+
+        assignments_str = ""
+        if req.completed_assignments:
+            assignments_str = "\n".join([
+                f'- {a.get("title")} (Category: {a.get("category")}, Completed: {a.get("completed")})' +
+                (f' Voice Response: "{a.get("voice_transcript")}"' if a.get("voice_transcript") else '')
+                for a in req.completed_assignments
+            ])
+        else:
+            assignments_str = "No recent completed assignments."
+
         prompt = (
             f"You are a clinical Speech-Language Pathologist (SLP) AI reviewer.\n"
             f"Synthesize this progress status for patient '{req.patient_name}':\n"
             f"- Speech Exercises Compliance Rate: {req.compliance_rate}%\n"
             f"- Consecutive Practice Streak: {req.streak} days\n"
             f"- Total Practiced Time: {req.hours_practiced} hours\n"
-            f"- Patient Transcripts:\n{transcripts_str}\n\n"
-            f"Write a concise, professional clinical progress summary as 2-3 short, standard text paragraphs.\n"
-            f"Describe compliance, consistency, and diagnostic recommendations.\n"
-            f"Do NOT use markdown bold, list bullets, hashes, or list markers. Return ONLY clean, readable plain text paragraphs."
+            f"- Patient Voice Journals & Transcripts:\n{transcripts_str}\n"
+            f"- Recent Game Struggles / Mistakes (Words/Quests patient got wrong):\n{struggles_str}\n"
+            f"- Completed Daily Assignments (and spoken voice responses):\n{assignments_str}\n\n"
+            f"Write a concise, professional clinical progress summary for the therapist as 3 short, standard text paragraphs:\n"
+            f"1. PATIENT PERFORMANCE SUMMARY: Describe compliance, consistency, and progress.\n"
+            f"2. JOURNAL & SENTIMENT ANALYSIS: Reflect on what the patient said in their voice journals, their emotions, and clinical symptoms (like pain, fatigue, recovery signs).\n"
+            f"3. BRAINSTORMED THERAPIST IMPROVEMENT GUIDE: Give specific, actionable tips on what the therapist should do next to help the patient improve. Brainstorm ideas based on the exact words/quests they got wrong (e.g. phoneme drills for those words) and how they completed their assignments."
+            f"\n\nDo NOT use markdown bold, list bullets, hashes, or list markers. Return ONLY clean, readable plain text paragraphs."
         )
         
         try:
-            summary = await asyncio.to_thread(query_hf_llm, prompt, max_tokens=300, temperature=0.3)
+            # Run the blocking query in a separate thread to keep fastapi responsive
+            summary = await asyncio.to_thread(query_hf_llm, prompt, max_tokens=350, temperature=0.3)
             # Strip any accidental markdown formatting the LLM might have returned
             summary = re.sub(r'\*+', '', summary)
             summary = re.sub(r'#+', '', summary)
@@ -400,16 +427,25 @@ def fastapi_app():
             else:
                 paragraph2 += f"Acoustic logs are currently empty, so active vocal characteristics and speech clarity cannot be evaluated."
 
-            # 3. Dynamic therapist recommendations
-            paragraph3 = f"Therapist Guidance: "
-            if req.compliance_rate < 40:
-                paragraph3 += f"Focus on assigning simple, low-effort single-word templates. Coordinate with hospital staff or family to ensure the device is accessible and functioning properly."
-            elif pain_count > 0:
-                paragraph3 += f"Introduce shorter, gentle vocal play and breathing exercises. Advise the patient to take frequent breaks and avoid forcing articulation during moments of muscle tension."
-            elif twi_count > 0:
-                paragraph3 += f"Continue utilizing Akan-specific voice board cards and monitor breath support on multi-syllable Twi phrases to refine phoneme transitions."
+            # 3. Dynamic therapist recommendations (Brainstormed therapist improvement guide)
+            paragraph3 = f"Therapist Guidance & Brainstormed Tips: "
+            
+            # Inject struggle feedback if present
+            if req.struggles and len(req.struggles) > 0:
+                wrong_items = [s.get("questTitle", "drills") for s in req.struggles[:2]]
+                paragraph3 += f"Based on recent session errors, the patient is experiencing coordination blocks on {', '.join(wrong_items)}. We brainstormed that the therapist should introduce slow tactile placement drills or syllable segmentation to bypass these specific phonetic traps. "
             else:
-                paragraph3 += f"Continue monitoring daily streak. We recommend introducing conversational short phrase prompts to advance recovery and build natural pacing."
+                paragraph3 += f"No specific exercise struggles were logged, showing that phonetic placement is stable. "
+
+            # Inject assignment feedback if present
+            if req.completed_assignments and len(req.completed_assignments) > 0:
+                comp_list = [a.get("title") for a in req.completed_assignments if a.get("completed")]
+                if comp_list:
+                    paragraph3 += f"The patient successfully completed their assigned missions: {', '.join(comp_list[:2])}. If these required voice recordings, their response shows sufficient phonation duration, and the therapist can now advance them to multi-syllable phrases."
+                else:
+                    paragraph3 += "Recent assignments are currently pending completion. Therapist should check if the patient finds the instructions too complex."
+            else:
+                paragraph3 += "No clinical assignments were recently completed. Suggest assigning low-demand vocal play exercises to re-engage."
 
             summary_text = f"{paragraph1}\n\n{paragraph2}\n\n{paragraph3}"
             return {'summary': summary_text, 'source': 'Deterministic Clinical Heuristic Analyzer'}

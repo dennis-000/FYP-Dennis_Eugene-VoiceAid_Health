@@ -52,6 +52,12 @@ export default function PatientDetailPage() {
     const [transcriptions, setTranscriptions] = useState<TranscriptionRow[]>([]);
     const [analytics, setAnalytics] = useState<any[]>([]);
     
+    // Date selection states
+    const [selectedDate, setSelectedDate] = useState<string>('');
+    const [availableDates, setAvailableDates] = useState<string[]>([]);
+    const [goals, setGoals] = useState<any[]>([]);
+    const [loadingGoals, setLoadingGoals] = useState(false);
+
     // Calculated stats
     const [compliance, setCompliance] = useState(85);
     const [streak, setStreak] = useState(0);
@@ -86,6 +92,14 @@ export default function PatientDetailPage() {
     }, [router]);
 
     useEffect(() => {
+        const last7: string[] = [];
+        for (let i = 0; i < 7; i++) {
+            const d = new Date();
+            d.setDate(d.getDate() - i);
+            last7.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`);
+        }
+        setAvailableDates(last7);
+        setSelectedDate(last7[0]); // default to today
         checkAuth();
     }, [checkAuth]);
 
@@ -192,6 +206,36 @@ export default function PatientDetailPage() {
         }
     };
 
+    const getTodayDateString = () => {
+        const d = new Date();
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    };
+
+    const loadGoalsForDate = useCallback(async (date: string) => {
+        if (!patientId || !date) return;
+        setLoadingGoals(true);
+        try {
+            const { data, error } = await supabase
+                .from('patient_goals')
+                .select('*')
+                .eq('patient_id', patientId)
+                .eq('assigned_date', date)
+                .order('created_at', { ascending: true });
+            if (error) throw error;
+            setGoals(data || []);
+        } catch (e) {
+            console.error('Error loading patient goals for date:', e);
+        } finally {
+            setLoadingGoals(false);
+        }
+    }, [patientId]);
+
+    useEffect(() => {
+        if (selectedDate) {
+            loadGoalsForDate(selectedDate);
+        }
+    }, [selectedDate, loadGoalsForDate]);
+
     const cleanMarkdown = (text: string) => {
         if (!text) return '';
         return text
@@ -210,6 +254,42 @@ export default function PatientDetailPage() {
         setGeneratingSummary(true);
         try {
             const recentTranscripts = transcriptions.slice(0, 8).map(t => t.text);
+
+            // Extract struggles/mistakes from session logs
+            const strugglesPayload: any[] = [];
+            analytics.forEach(s => {
+                if (s.metadata?.struggles) {
+                    s.metadata.struggles.forEach((st: any) => {
+                        strugglesPayload.push({
+                            questTitle: st.questTitle || 'Phrase Quest',
+                            attempts: st.attempts || 1,
+                            detail: st.detail || 'Wrong sentence arrangement'
+                        });
+                    });
+                } else if (s.metadata?.incorrectAttempts > 0) {
+                    strugglesPayload.push({
+                        questTitle: s.metadata?.questTitle || 'Word Game Practice',
+                        attempts: s.metadata.incorrectAttempts,
+                        detail: s.metadata.details || 'Struggled with speech repetition / word match'
+                    });
+                }
+            });
+
+            // Fetch completed assignments from the database to send
+            const { data: allGoalsData } = await supabase
+                .from('patient_goals')
+                .select('*')
+                .eq('patient_id', patientId);
+            
+            const completedAssignmentsPayload = (allGoalsData || [])
+                .filter((g: any) => g.completed)
+                .map((g: any) => ({
+                    title: g.title,
+                    category: g.category,
+                    completed: g.completed,
+                    voice_transcript: g.voice_transcript || null
+                }));
+
             const response = await fetch(`${backendUrl}/predict/summary`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -218,7 +298,9 @@ export default function PatientDetailPage() {
                     transcripts: recentTranscripts,
                     compliance_rate: compliance,
                     streak: streak,
-                    hours_practiced: hoursPracticed
+                    hours_practiced: hoursPracticed,
+                    struggles: strugglesPayload.slice(0, 10),
+                    completed_assignments: completedAssignmentsPayload.slice(0, 10)
                 })
             });
             const data = await response.json();
@@ -466,6 +548,101 @@ export default function PatientDetailPage() {
                         )}
                     </div>
 
+                    {/* Daily Assignments Selector Card */}
+                    <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm relative overflow-hidden">
+                        <div className="flex items-center justify-between mb-4">
+                            <div className="flex items-center gap-2">
+                                <Calendar size={20} className="text-gray-500" />
+                                <h2 className="text-lg font-bold text-gray-900">Daily Assignments</h2>
+                            </div>
+                        </div>
+
+                        {/* Date selection strip */}
+                        <div className="flex gap-2 mb-6 overflow-x-auto pb-2 scrollbar-hide">
+                            {availableDates.map(date => {
+                                const isSelected = date === selectedDate;
+                                const isT = date === getTodayDateString();
+                                // format date nicely
+                                const formatted = (() => {
+                                    if (date === getTodayDateString()) return 'Today';
+                                    const d = new Date(date + 'T00:00:00');
+                                    return d.toLocaleDateString('en-US', { weekday: 'short', day: 'numeric', month: 'short' });
+                                })();
+                                return (
+                                    <button
+                                        key={date}
+                                        onClick={() => setSelectedDate(date)}
+                                        className={`px-3 py-1.5 rounded-xl border text-xs font-bold transition-all whitespace-nowrap ${
+                                            isSelected
+                                                ? 'bg-[#CC0000] border-[#CC0000] text-white shadow-sm'
+                                                : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'
+                                        }`}
+                                    >
+                                        <span className={isSelected ? 'text-white' : isT ? 'text-[#CC0000]' : 'text-gray-500'}>
+                                            {formatted}
+                                        </span>
+                                    </button>
+                                );
+                            })}
+                        </div>
+
+                        {/* Assignments List */}
+                        {loadingGoals ? (
+                            <div className="py-8 text-center">
+                                <Loader2 className="w-6 h-6 animate-spin text-[#CC0000] mx-auto" />
+                            </div>
+                        ) : goals.length === 0 ? (
+                            <div className="py-8 text-center text-gray-400 border border-dashed border-gray-100 rounded-xl">
+                                <p className="text-sm font-semibold text-gray-400">No assignments for this date.</p>
+                            </div>
+                        ) : (
+                            <div className="space-y-3">
+                                {goals.map((g: any) => {
+                                    const categoryLabels: Record<string, string> = {
+                                        communication: 'Communication',
+                                        language: 'Language',
+                                        social: 'Social',
+                                        fluency: 'Fluency',
+                                        voice: 'Voice',
+                                        speech_sound: 'Speech Sound',
+                                    };
+                                    return (
+                                        <div key={g.id} className="p-4 bg-gray-50 border border-gray-100 rounded-2xl flex items-start justify-between gap-4">
+                                            <div className="space-y-1 flex-1">
+                                                <div className="flex items-center gap-2 flex-wrap">
+                                                    <span className="text-[10px] font-bold uppercase tracking-wider bg-gray-200 text-gray-700 px-2 py-0.5 rounded-md">
+                                                        {categoryLabels[g.category] || g.category}
+                                                    </span>
+                                                    {g.requires_recording && (
+                                                        <span className="text-[10px] font-bold uppercase tracking-wider bg-purple-100 text-purple-700 px-2 py-0.5 rounded-md">
+                                                            Voice Recording
+                                                        </span>
+                                                    )}
+                                                    {g.completed && (
+                                                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-green-700 bg-green-100 px-2 py-0.5 rounded-md">
+                                                            <CheckCircle2 size={10} /> Completed
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <h4 className="text-sm font-bold text-gray-900 mt-1">{g.title}</h4>
+                                                {g.description && (
+                                                    <p className="text-xs text-gray-500 leading-relaxed">{g.description}</p>
+                                                )}
+                                                {/* Patient Voice Response */}
+                                                {g.voice_transcript && (
+                                                    <div className="mt-3 p-3 bg-green-50 border border-green-100 rounded-xl">
+                                                        <span className="text-[10px] font-bold text-green-700 uppercase tracking-wider block mb-1">Patient Verbal Response</span>
+                                                        <p className="text-xs text-green-800 font-medium italic">"{g.voice_transcript}"</p>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </div>
+
                     {/* Transcriptions History */}
                     <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm">
                         <div className="px-6 py-5 border-b border-gray-100 flex items-center justify-between">
@@ -618,6 +795,64 @@ export default function PatientDetailPage() {
                                 <p className="text-[10px] text-gray-400 mt-1">Click Analyze to process emotional sentiment.</p>
                             </div>
                         )}
+                    </div>
+
+                    {/* Cognitive Struggle History Card */}
+                    <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm">
+                        <div className="flex items-center gap-2 mb-4">
+                            <ShieldAlert size={18} className="text-red-500" />
+                            <h3 className="text-base font-bold text-gray-900">Cognitive Struggle History</h3>
+                        </div>
+                        {(() => {
+                            const struggles: Array<{ questTitle: string; date: string; incorrectAttempts: number; detail?: string }> = [];
+                            analytics.forEach(s => {
+                                if (s.metadata?.struggles) {
+                                    s.metadata.struggles.forEach((st: any) => {
+                                        struggles.push({
+                                            questTitle: st.questTitle || 'Phrase Quest',
+                                            date: s.created_at || s.date,
+                                            incorrectAttempts: st.attempts || 1,
+                                            detail: st.detail || 'Wrong sentence arrangement'
+                                        });
+                                    });
+                                } else if (s.metadata?.incorrectAttempts > 0) {
+                                    struggles.push({
+                                        questTitle: s.metadata?.questTitle || 'Word Game Practice',
+                                        date: s.created_at || s.date,
+                                        incorrectAttempts: s.metadata.incorrectAttempts,
+                                        detail: s.metadata.details || 'Struggled with speech repetition / word match'
+                                    });
+                                }
+                            });
+
+                            if (struggles.length === 0) {
+                                return (
+                                    <div className="p-4 bg-emerald-50 border border-emerald-100 rounded-xl text-center">
+                                        <p className="text-xs text-emerald-800 font-bold">Perfect Streak</p>
+                                        <p className="text-[11px] text-emerald-600 mt-0.5">No speech coordination blocks or game failures logged.</p>
+                                    </div>
+                                );
+                            }
+
+                            return (
+                                <div className="space-y-3 max-h-[320px] overflow-y-auto pr-1">
+                                    {struggles.slice(0, 8).map((st, index) => (
+                                        <div key={index} className="p-3 bg-red-50/50 border border-red-100 rounded-xl">
+                                            <div className="flex justify-between items-center gap-2">
+                                                <h4 className="text-xs font-bold text-gray-950">{st.questTitle}</h4>
+                                                <span className="text-[10px] font-bold text-red-600 bg-red-100 px-1.5 py-0.5 rounded">
+                                                    {st.incorrectAttempts} error{st.incorrectAttempts > 1 ? 's' : ''}
+                                                </span>
+                                            </div>
+                                            <p className="text-[11px] text-gray-600 mt-1 leading-relaxed">{st.detail}</p>
+                                            <span className="text-[9px] text-gray-400 block mt-1.5 font-mono">
+                                                {new Date(st.date).toLocaleDateString()}
+                                            </span>
+                                        </div>
+                                    ))}
+                                </div>
+                            );
+                        })()}
                     </div>
 
                     {/* AI Personalized Recommendations */}

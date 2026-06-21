@@ -33,7 +33,20 @@ import {
     X 
 } from 'lucide-react-native';
 import { useAuth } from '../contexts/AuthContext';
-import { GoalCategory, GoalService, PatientGoal } from '../services/goalService';
+import { GoalCategory, GoalService, PatientGoal, todayDate } from '../services/goalService';
+
+const formatDateLabel = (dateStr: string): string => {
+    const today = todayDate();
+    const yesterday = (() => {
+        const d = new Date();
+        d.setDate(d.getDate() - 1);
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    })();
+    if (dateStr === today) return 'Today';
+    if (dateStr === yesterday) return 'Yesterday';
+    const d = new Date(dateStr + 'T00:00:00');
+    return d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
+};
 import { JournalService, VoiceJournal } from '../services/journalService';
 import { AnalyticsService, SessionRecord } from '../services/analyticsService';
 import { AppContext } from './_layout';
@@ -105,6 +118,10 @@ export default function PatientDetailScreen() {
     const [filterCat, setFilterCat] = useState<GoalCategory | 'all'>('all');
     const [activeAlert, setActiveAlert] = useState<SessionRecord | null>(null);
 
+    // Date selection states
+    const [selectedDate, setSelectedDate] = useState<string>(todayDate());
+    const [availableDates, setAvailableDates] = useState<string[]>([]);
+
     // AI Progress states
     const [aiSummary, setAiSummary] = useState<string>('');
     const [generatingSummary, setGeneratingSummary] = useState(false);
@@ -139,8 +156,39 @@ export default function PatientDetailScreen() {
                 const uniqueDays = new Set(analytics.map(a => a.date.split('T')[0]));
                 streakVal = uniqueDays.size;
             }
-            const completedGoals = goals.filter(g => g.completed).length;
-            const complianceVal = goals.length > 0 ? Math.round((completedGoals / goals.length) * 100) : 80;
+            
+            const allGoals = await GoalService.getPatientGoals(patientId);
+            const completedGoals = allGoals.filter(g => g.completed).length;
+            const complianceVal = allGoals.length > 0 ? Math.round((completedGoals / allGoals.length) * 100) : 80;
+
+            // Extract struggles/mistakes from session logs
+            const strugglesPayload: any[] = [];
+            analytics.forEach(s => {
+                if (s.metadata?.struggles) {
+                    s.metadata.struggles.forEach((st: any) => {
+                        strugglesPayload.push({
+                            questTitle: st.questTitle || 'Phrase Quest',
+                            attempts: st.attempts || 1,
+                            detail: st.detail || 'Wrong sentence arrangement'
+                        });
+                    });
+                } else if (s.metadata?.incorrectAttempts > 0) {
+                    strugglesPayload.push({
+                        questTitle: s.metadata?.questTitle || 'Word Game Practice',
+                        attempts: s.metadata.incorrectAttempts,
+                        detail: s.metadata.details || 'Struggled with speech repetition / word match'
+                    });
+                }
+            });
+
+            const completedAssignmentsPayload = allGoals
+                .filter(g => g.completed)
+                .map(g => ({
+                    title: g.title,
+                    category: g.category,
+                    completed: g.completed,
+                    voice_transcript: (g as any).voice_transcript || null
+                }));
 
             const res = await fetch(`${API_BASE_URL}/predict/summary`, {
                 method: 'POST',
@@ -150,7 +198,9 @@ export default function PatientDetailScreen() {
                     transcripts: recentTranscripts,
                     compliance_rate: complianceVal,
                     streak: streakVal || 3,
-                    hours_practiced: hours || 1.5
+                    hours_practiced: hours || 1.5,
+                    struggles: strugglesPayload.slice(0, 10),
+                    completed_assignments: completedAssignmentsPayload.slice(0, 10)
                 })
             });
             const data = await res.json();
@@ -214,7 +264,15 @@ export default function PatientDetailScreen() {
     const CATEGORY_TABS: (GoalCategory | 'all')[] = ['all', 'communication', 'language', 'social', 'fluency', 'voice', 'speech_sound'];
 
     useEffect(() => {
-        loadGoals();
+        // Initialize last 7 days
+        const last7: string[] = [];
+        for (let i = 0; i < 7; i++) {
+            const d = new Date();
+            d.setDate(d.getDate() - i);
+            last7.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`);
+        }
+        setAvailableDates(last7);
+
         loadJournals();
         loadAnalytics();
         loadMoodLogs();
@@ -260,6 +318,12 @@ export default function PatientDetailScreen() {
             supabase.removeChannel(channel);
         };
     }, [patientId]);
+
+    useEffect(() => {
+        if (patientId) {
+            loadGoals();
+        }
+    }, [patientId, selectedDate]);
 
     const loadAnalytics = async () => {
         const data = await AnalyticsService.getPatientAnalytics(patientId);
@@ -308,7 +372,7 @@ export default function PatientDetailScreen() {
 
     const loadGoals = async () => {
         setLoading(true);
-        const data = await GoalService.getPatientGoals(patientId);
+        const data = await GoalService.getGoalsByDate(patientId, selectedDate);
         setGoals(data);
         setLoading(false);
     };
@@ -521,6 +585,51 @@ export default function PatientDetailScreen() {
                                 </TouchableOpacity>
                             </View>
                         </View>
+
+                        {/* ── Date Selector Strip ── */}
+                        <ScrollView
+                            horizontal
+                            showsHorizontalScrollIndicator={false}
+                            style={{ marginBottom: 12 }}
+                            contentContainerStyle={{ gap: 8, paddingVertical: 4 }}
+                        >
+                            {availableDates.map(date => {
+                                const isSelected = date === selectedDate;
+                                const isT = date === todayDate();
+                                return (
+                                    <TouchableOpacity
+                                        key={date}
+                                        onPress={() => setSelectedDate(date)}
+                                        activeOpacity={0.85}
+                                        style={{
+                                            paddingHorizontal: 16,
+                                            paddingVertical: 8,
+                                            borderRadius: 20,
+                                            borderWidth: 1,
+                                            alignItems: 'center',
+                                            backgroundColor: isSelected ? colors.primary : colors.card,
+                                            borderColor: isSelected ? colors.primary : colors.border,
+                                        }}
+                                    >
+                                        <Text style={{
+                                            fontSize: 12,
+                                            fontWeight: '600',
+                                            color: isSelected ? '#fff' : isT ? colors.primary : colors.subText,
+                                        }}>
+                                            {formatDateLabel(date)}
+                                        </Text>
+                                    </TouchableOpacity>
+                                );
+                            })}
+                        </ScrollView>
+
+                        {selectedDate !== todayDate() && (
+                            <View style={{ backgroundColor: '#fef9c3', paddingVertical: 8, paddingHorizontal: 12, borderRadius: 8, marginBottom: 12 }}>
+                                <Text style={{ color: '#92400e', fontSize: 12, textAlign: 'center', fontWeight: '500' }}>
+                                    📖 Viewing past daily assignments
+                                </Text>
+                            </View>
+                        )}
 
                         {/* Category Filter Tabs */}
                         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
