@@ -57,6 +57,7 @@ export default function PatientDetailPage() {
     const [availableDates, setAvailableDates] = useState<string[]>([]);
     const [goals, setGoals] = useState<any[]>([]);
     const [loadingGoals, setLoadingGoals] = useState(false);
+    const [activeTab, setActiveTab] = useState<'assignments' | 'journal' | 'transcripts'>('assignments');
 
     // Calculated stats
     const [compliance, setCompliance] = useState(85);
@@ -548,170 +549,249 @@ export default function PatientDetailPage() {
                         )}
                     </div>
 
+                    {/* Tab Navigation Strip */}
+                    <div className="flex gap-2 border-b border-gray-100 pb-px mb-6 overflow-x-auto">
+                        <button
+                            onClick={() => setActiveTab('assignments')}
+                            className={`flex items-center gap-2 px-6 py-3 text-sm font-bold rounded-t-lg transition-all border-b-2 ${
+                                activeTab === 'assignments' 
+                                    ? 'border-[#CC0000] text-[#CC0000] bg-gray-50/50' 
+                                    : 'border-transparent text-gray-500 hover:text-[#CC0000]'
+                            }`}
+                        >
+                            Daily Assignments
+                        </button>
+                        <button
+                            onClick={() => setActiveTab('journal')}
+                            className={`flex items-center gap-2 px-6 py-3 text-sm font-bold rounded-t-lg transition-all border-b-2 ${
+                                activeTab === 'journal' 
+                                    ? 'border-[#CC0000] text-[#CC0000] bg-gray-50/50' 
+                                    : 'border-transparent text-gray-500 hover:text-[#CC0000]'
+                            }`}
+                        >
+                            Voice Journal
+                        </button>
+                        <button
+                            onClick={() => setActiveTab('transcripts')}
+                            className={`flex items-center gap-2 px-6 py-3 text-sm font-bold rounded-t-lg transition-all border-b-2 ${
+                                activeTab === 'transcripts' 
+                                    ? 'border-[#CC0000] text-[#CC0000] bg-gray-50/50' 
+                                    : 'border-transparent text-gray-500 hover:text-[#CC0000]'
+                            }`}
+                        >
+                            ASR Transcripts Log
+                        </button>
+                    </div>
+
                     {/* Daily Assignments Selector Card */}
-                    <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm relative overflow-hidden">
-                        <div className="flex items-center justify-between mb-4">
-                            <div className="flex items-center gap-2">
-                                <Calendar size={20} className="text-gray-500" />
-                                <h2 className="text-lg font-bold text-gray-900">Daily Assignments</h2>
+                    {activeTab === 'assignments' && (
+                        <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm relative overflow-hidden">
+                            <div className="flex items-center justify-between mb-4">
+                                <div className="flex items-center gap-2">
+                                    <Calendar size={20} className="text-gray-500" />
+                                    <h2 className="text-lg font-bold text-gray-900">Daily Assignments</h2>
+                                </div>
                             </div>
-                        </div>
 
-                        {/* Date selection strip */}
-                        <div className="flex gap-2 mb-6 overflow-x-auto pb-2 scrollbar-hide">
-                            {availableDates.map(date => {
-                                const isSelected = date === selectedDate;
-                                const isT = date === getTodayDateString();
-                                // format date nicely
-                                const formatted = (() => {
-                                    if (date === getTodayDateString()) return 'Today';
-                                    const d = new Date(date + 'T00:00:00');
-                                    return d.toLocaleDateString('en-US', { weekday: 'short', day: 'numeric', month: 'short' });
-                                })();
-                                return (
-                                    <button
-                                        key={date}
-                                        onClick={() => setSelectedDate(date)}
-                                        className={`px-3 py-1.5 rounded-xl border text-xs font-bold transition-all whitespace-nowrap ${
-                                            isSelected
-                                                ? 'bg-[#CC0000] border-[#CC0000] text-white shadow-sm'
-                                                : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'
-                                        }`}
-                                    >
-                                        <span className={isSelected ? 'text-white' : isT ? 'text-[#CC0000]' : 'text-gray-500'}>
-                                            {formatted}
-                                        </span>
-                                    </button>
-                                );
-                            })}
-                        </div>
-
-                        {/* Assignments List */}
-                        {loadingGoals ? (
-                            <div className="py-8 text-center">
-                                <Loader2 className="w-6 h-6 animate-spin text-[#CC0000] mx-auto" />
-                            </div>
-                        ) : goals.length === 0 ? (
-                            <div className="py-8 text-center text-gray-400 border border-dashed border-gray-100 rounded-xl">
-                                <p className="text-sm font-semibold text-gray-400">No assignments for this date.</p>
-                            </div>
-                        ) : (
-                            <div className="space-y-3">
-                                {goals.map((g: any) => {
-                                    const categoryLabels: Record<string, string> = {
-                                        communication: 'Communication',
-                                        language: 'Language',
-                                        social: 'Social',
-                                        fluency: 'Fluency',
-                                        voice: 'Voice',
-                                        speech_sound: 'Speech Sound',
-                                    };
+                            {/* Date selection strip */}
+                            <div className="flex gap-2 mb-6 overflow-x-auto pb-2 scrollbar-hide">
+                                {availableDates.map(date => {
+                                    const isSelected = date === selectedDate;
+                                    const isT = date === getTodayDateString();
+                                    // format date nicely
+                                    const formatted = (() => {
+                                        if (date === getTodayDateString()) return 'Today';
+                                        const d = new Date(date + 'T00:00:00');
+                                        return d.toLocaleDateString('en-US', { weekday: 'short', day: 'numeric', month: 'short' });
+                                    })();
                                     return (
-                                        <div key={g.id} className="p-4 bg-gray-50 border border-gray-100 rounded-2xl flex items-start justify-between gap-4">
-                                            <div className="space-y-1 flex-1">
-                                                <div className="flex items-center gap-2 flex-wrap">
-                                                    <span className="text-[10px] font-bold uppercase tracking-wider bg-gray-200 text-gray-700 px-2 py-0.5 rounded-md">
-                                                        {categoryLabels[g.category] || g.category}
-                                                    </span>
-                                                    {g.requires_recording && (
-                                                        <span className="text-[10px] font-bold uppercase tracking-wider bg-purple-100 text-purple-700 px-2 py-0.5 rounded-md">
-                                                            Voice Recording
-                                                        </span>
-                                                    )}
-                                                    {g.completed && (
-                                                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-green-700 bg-green-100 px-2 py-0.5 rounded-md">
-                                                            <CheckCircle2 size={10} /> Completed
-                                                        </span>
-                                                    )}
-                                                </div>
-                                                <h4 className="text-sm font-bold text-gray-900 mt-1">{g.title}</h4>
-                                                {g.description && (
-                                                    <p className="text-xs text-gray-500 leading-relaxed">{g.description}</p>
-                                                )}
-                                                {/* Patient Voice Response */}
-                                                {g.voice_transcript && (
-                                                    <div className="mt-3 p-3 bg-green-50 border border-green-100 rounded-xl">
-                                                        <span className="text-[10px] font-bold text-green-700 uppercase tracking-wider block mb-1">Patient Verbal Response</span>
-                                                        <p className="text-xs text-green-800 font-medium italic">"{g.voice_transcript}"</p>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </div>
+                                        <button
+                                            key={date}
+                                            onClick={() => setSelectedDate(date)}
+                                            className={`px-3 py-1.5 rounded-xl border text-xs font-bold transition-all whitespace-nowrap ${
+                                                isSelected
+                                                    ? 'bg-[#CC0000] border-[#CC0000] text-white shadow-sm'
+                                                    : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'
+                                            }`}
+                                        >
+                                            <span className={isSelected ? 'text-white' : isT ? 'text-[#CC0000]' : 'text-gray-500'}>
+                                                {formatted}
+                                            </span>
+                                        </button>
                                     );
                                 })}
                             </div>
-                        )}
-                    </div>
+
+                            {/* Assignments List */}
+                            {loadingGoals ? (
+                                <div className="py-8 text-center">
+                                    <Loader2 className="w-6 h-6 animate-spin text-[#CC0000] mx-auto" />
+                                </div>
+                            ) : goals.length === 0 ? (
+                                <div className="py-8 text-center text-gray-400 border border-dashed border-gray-100 rounded-xl">
+                                    <p className="text-sm font-semibold text-gray-400">No assignments for this date.</p>
+                                </div>
+                            ) : (
+                                <div className="space-y-3">
+                                    {goals.map((g: any) => {
+                                        const categoryLabels: Record<string, string> = {
+                                            communication: 'Communication',
+                                            language: 'Language',
+                                            social: 'Social',
+                                            fluency: 'Fluency',
+                                            voice: 'Voice',
+                                            speech_sound: 'Speech Sound',
+                                        };
+                                        return (
+                                            <div key={g.id} className="p-4 bg-gray-50 border border-gray-100 rounded-2xl flex items-start justify-between gap-4">
+                                                <div className="space-y-1 flex-1">
+                                                    <div className="flex items-center gap-2 flex-wrap">
+                                                        <span className="text-[10px] font-bold uppercase tracking-wider bg-gray-200 text-gray-700 px-2 py-0.5 rounded-md">
+                                                            {categoryLabels[g.category] || g.category}
+                                                        </span>
+                                                        {g.requires_recording && (
+                                                            <span className="text-[10px] font-bold uppercase tracking-wider bg-purple-100 text-purple-700 px-2 py-0.5 rounded-md">
+                                                                Voice Recording
+                                                            </span>
+                                                        )}
+                                                        {g.completed && (
+                                                            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-green-700 bg-green-100 px-2 py-0.5 rounded-md">
+                                                                <CheckCircle2 size={10} /> Completed
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    <h4 className="text-sm font-bold text-gray-900 mt-1">{g.title}</h4>
+                                                    {g.description && (
+                                                        <p className="text-xs text-gray-500 leading-relaxed">{g.description}</p>
+                                                    )}
+                                                    {/* Patient Voice Response */}
+                                                    {g.voice_transcript && (
+                                                        <div className="mt-3 p-3 bg-green-50 border border-green-100 rounded-xl">
+                                                            <span className="text-[10px] font-bold text-green-700 uppercase tracking-wider block mb-1">Patient Verbal Response</span>
+                                                            <p className="text-xs text-green-800 font-medium italic">"{g.voice_transcript}"</p>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* Voice Journal Card */}
+                    {activeTab === 'journal' && (
+                        <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm relative overflow-hidden">
+                            <div className="flex items-center justify-between mb-6">
+                                <div className="flex items-center gap-3">
+                                    <Volume2 size={20} className="text-[#CC0000]" />
+                                    <h2 className="text-lg font-bold text-gray-900">Voice Journal History</h2>
+                                </div>
+                                <span className="text-xs bg-gray-50 text-gray-500 font-bold border border-gray-100 px-3 py-1 rounded-xl">
+                                    Average: {journals.length > 0 ? Math.round(journals.reduce((sum, j) => sum + (j.wpm || 0), 0) / journals.length) : 0} WPM
+                                </span>
+                            </div>
+
+                            {journals.length === 0 ? (
+                                <div className="p-8 text-center border border-dashed border-gray-200 rounded-2xl text-gray-400">
+                                    <MessageSquare className="w-10 h-10 text-gray-300 mx-auto mb-2" />
+                                    <p className="text-sm font-semibold">No journal entries recorded.</p>
+                                </div>
+                            ) : (
+                                <div className="space-y-4">
+                                    {journals.map((journal: any) => (
+                                        <div key={journal.id} className="p-4 bg-gray-50 border border-gray-100 rounded-2xl flex flex-col gap-2 hover:bg-gray-50/80 transition-colors">
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-xs text-gray-400 font-semibold flex items-center gap-1">
+                                                    <Clock size={12} />
+                                                    {new Date(journal.created_at).toLocaleString()}
+                                                </span>
+                                                <span className="text-xs font-bold text-[#CC0000] bg-[#CC0000]/10 px-2.5 py-0.5 rounded-full">
+                                                    {journal.wpm || 0} WPM
+                                                </span>
+                                            </div>
+                                            <p className="text-sm font-semibold text-gray-800 italic leading-relaxed">
+                                                "{journal.transcript}"
+                                            </p>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    )}
 
                     {/* Transcriptions History */}
-                    <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm">
-                        <div className="px-6 py-5 border-b border-gray-100 flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                                <MessageSquare size={20} className="text-gray-400" />
-                                <h2 className="text-lg font-bold text-gray-900 font-sans">Recent Transcripts Log</h2>
+                    {activeTab === 'transcripts' && (
+                        <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm">
+                            <div className="px-6 py-5 border-b border-gray-100 flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                    <MessageSquare size={20} className="text-gray-400" />
+                                    <h2 className="text-lg font-bold text-gray-900 font-sans">Recent Transcripts Log</h2>
+                                </div>
+                                <span className="text-xs bg-gray-50 text-gray-400 font-bold border border-gray-100 px-2 py-0.5 rounded-md">
+                                    {transcriptions.length} items
+                                </span>
                             </div>
-                            <span className="text-xs bg-gray-50 text-gray-400 font-bold border border-gray-100 px-2 py-0.5 rounded-md">
-                                {transcriptions.length} items
-                            </span>
-                        </div>
 
-                        <div className="overflow-x-auto">
-                            <table className="min-w-full">
-                                <thead>
-                                    <tr className="border-b border-gray-100">
-                                        <th className="px-6 py-4 text-left text-[11px] font-bold text-gray-400 uppercase tracking-wider">Output Phrase</th>
-                                        <th className="px-6 py-4 text-left text-[11px] font-bold text-gray-400 uppercase tracking-wider">Language</th>
-                                        <th className="px-6 py-4 text-left text-[11px] font-bold text-gray-400 uppercase tracking-wider">ASR Score</th>
-                                        <th className="px-6 py-4 text-left text-[11px] font-bold text-gray-400 uppercase tracking-wider">Date & Time</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-gray-50">
-                                    {transcriptions.length === 0 ? (
-                                        <tr>
-                                            <td colSpan={4} className="px-6 py-12 text-center text-sm text-gray-400">
-                                                No transcripts recorded for this patient.
-                                            </td>
+                            <div className="overflow-x-auto">
+                                <table className="min-w-full">
+                                    <thead>
+                                        <tr className="border-b border-gray-100">
+                                            <th className="px-6 py-4 text-left text-[11px] font-bold text-gray-400 uppercase tracking-wider">Output Phrase</th>
+                                            <th className="px-6 py-4 text-left text-[11px] font-bold text-gray-400 uppercase tracking-wider">Language</th>
+                                            <th className="px-6 py-4 text-left text-[11px] font-bold text-gray-400 uppercase tracking-wider">ASR Score</th>
+                                            <th className="px-6 py-4 text-left text-[11px] font-bold text-gray-400 uppercase tracking-wider">Date & Time</th>
                                         </tr>
-                                    ) : (
-                                        transcriptions.map(log => (
-                                            <tr key={log.id} className="hover:bg-gray-50/50 transition-colors">
-                                                <td className="px-6 py-4 text-sm font-semibold text-gray-900 italic">"{log.text}"</td>
-                                                <td className="px-6 py-4">
-                                                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-bold ${
-                                                        log.language === 'tw' || log.language === 'twi'
-                                                            ? 'bg-[#FFD700]/20 text-[#111111]'
-                                                            : log.language === 'ga'
-                                                            ? 'bg-[#008000]/10 text-[#008000]'
-                                                            : 'bg-[#CC0000]/10 text-[#CC0000]'
-                                                    }`}>
-                                                        {log.language === 'tw' || log.language === 'twi' ? 'Twi' : log.language === 'ga' ? 'Ga' : 'English'}
-                                                    </span>
-                                                </td>
-                                                <td className="px-6 py-4">
-                                                    <div className="flex items-center gap-1.5">
-                                                        <div className="w-12 h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                                                            <div 
-                                                                className={`h-full rounded-full ${
-                                                                    (log.confidence_score || 0.85) > 0.8 ? 'bg-[#008000]' : 'bg-[#FFD700]'
-                                                                }`} 
-                                                                style={{ width: `${(log.confidence_score || 0.85) * 100}%` }} 
-                                                            />
-                                                        </div>
-                                                        <span className="text-xs font-mono font-bold text-gray-500">
-                                                            {Math.round((log.confidence_score || 0.85) * 100)}%
-                                                        </span>
-                                                    </div>
-                                                </td>
-                                                <td className="px-6 py-4 text-xs text-gray-400 font-semibold whitespace-nowrap">
-                                                    {new Date(log.created_at).toLocaleString()}
+                                    </thead>
+                                    <tbody className="divide-y divide-gray-50">
+                                        {transcriptions.length === 0 ? (
+                                            <tr>
+                                                <td colSpan={4} className="px-6 py-12 text-center text-sm text-gray-400">
+                                                    No transcripts recorded for this patient.
                                                 </td>
                                             </tr>
-                                        ))
-                                    )}
-                                </tbody>
-                            </table>
+                                        ) : (
+                                            transcriptions.map(log => (
+                                                <tr key={log.id} className="hover:bg-gray-50/50 transition-colors">
+                                                    <td className="px-6 py-4 text-sm font-semibold text-gray-900 italic">"{log.text}"</td>
+                                                    <td className="px-6 py-4">
+                                                        <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-bold ${
+                                                            log.language === 'tw' || log.language === 'twi'
+                                                                ? 'bg-[#FFD700]/20 text-[#111111]'
+                                                                : log.language === 'ga'
+                                                                ? 'bg-[#008000]/10 text-[#008000]'
+                                                                : 'bg-[#CC0000]/10 text-[#CC0000]'
+                                                        }`}>
+                                                            {log.language === 'tw' || log.language === 'twi' ? 'Twi' : log.language === 'ga' ? 'Ga' : 'English'}
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-6 py-4">
+                                                        <div className="flex items-center gap-1.5">
+                                                            <div className="w-12 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                                                                <div 
+                                                                    className={`h-full rounded-full ${
+                                                                        (log.confidence_score || 0.85) > 0.8 ? 'bg-[#008000]' : 'bg-[#FFD700]'
+                                                                    }`} 
+                                                                    style={{ width: `${(log.confidence_score || 0.85) * 100}%` }} 
+                                                                />
+                                                            </div>
+                                                            <span className="text-xs font-mono font-bold text-gray-500">
+                                                                {Math.round((log.confidence_score || 0.85) * 100)}%
+                                                            </span>
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-6 py-4 text-xs text-gray-400 font-semibold whitespace-nowrap">
+                                                        {new Date(log.created_at).toLocaleString()}
+                                                    </td>
+                                                </tr>
+                                            ))
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
-                    </div>
+                    )}
                 </div>
 
                 {/* Column 2: Side Panel (Sentiment & Recommendations) */}
