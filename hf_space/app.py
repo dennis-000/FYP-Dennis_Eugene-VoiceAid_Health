@@ -310,12 +310,11 @@ def query_hf_llm(prompt: str, max_tokens: int = 250, temperature: float = 0.3) -
         
         for model_name in sdk_models:
             try:
-                client = InferenceClient(model=model_name, token=token)
+                client = InferenceClient(model=model_name, token=token, timeout=10)
                 response = client.text_generation(
                     prompt,
                     max_new_tokens=max_tokens,
-                    temperature=temperature,
-                    timeout=10
+                    temperature=temperature
                 )
                 if response and response.strip():
                     return response.strip()
