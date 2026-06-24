@@ -33,7 +33,9 @@ export const validateOrganizationCode = async (code: string): Promise<Organizati
             .single();
 
         if (error) {
-            console.error('Error validating organization code:', error);
+            if (error.code !== 'PGRST116') {
+                console.error('Error validating organization code:', error);
+            }
             return null;
         }
 

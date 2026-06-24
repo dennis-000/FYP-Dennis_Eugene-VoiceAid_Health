@@ -57,7 +57,8 @@ export default function PatientDetailPage() {
     const [availableDates, setAvailableDates] = useState<string[]>([]);
     const [goals, setGoals] = useState<any[]>([]);
     const [loadingGoals, setLoadingGoals] = useState(false);
-    const [activeTab, setActiveTab] = useState<'assignments' | 'journal' | 'transcripts'>('assignments');
+    const [activeTab, setActiveTab] = useState<'assignments' | 'journal' | 'transcripts' | 'history'>('assignments');
+    const [sessionHistory, setSessionHistory] = useState<any[]>([]);
 
     // Calculated stats
     const [compliance, setCompliance] = useState(85);
@@ -85,7 +86,7 @@ export default function PatientDetailPage() {
     const [aiJournalAnalysis, setAiJournalAnalysis] = useState<string>('');
     const [analyzingJournal, setAnalyzingJournal] = useState(false);
 
-    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://dennis-9-voiceaid-health-backend.hf.space';
+    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://dennis-9-voiceaid-backend.hf.space';
 
     const checkAuth = useCallback(async () => {
         const { data: { session } } = await supabase.auth.getSession();
@@ -123,7 +124,7 @@ export default function PatientDetailPage() {
             const uid = profileData.user_id;
 
             // 2. Load patient analytics & transcriptions using union keys
-            const [analyticsRes, transcriptionsRes, moodLogsRes, journalsRes] = await Promise.all([
+            const [analyticsRes, transcriptionsRes, moodLogsRes, journalsRes, goalsRes] = await Promise.all([
                 supabase
                     .from('patient_analytics')
                     .select('*')
@@ -144,18 +145,35 @@ export default function PatientDetailPage() {
                     .from('voice_journals')
                     .select('*')
                     .eq('patient_id', patientId)
-                    .order('created_at', { ascending: false })
+                    .order('created_at', { ascending: false }),
+                supabase
+                    .from('patient_goals')
+                    .select('id, completed')
+                    .eq('patient_id', patientId)
             ]);
 
             const dbAnalytics = analyticsRes.data || [];
             const dbTranscriptions = transcriptionsRes.data || [];
             const dbMoodLogs = moodLogsRes.data || [];
             const dbJournals = journalsRes.data || [];
+            const dbGoals = goalsRes.data || [];
 
             setAnalytics(dbAnalytics);
             setTranscriptions(dbTranscriptions);
             setMoodLevels(dbMoodLogs.map((m: any) => m.mood_level));
             setJournals(dbJournals);
+
+            // Build a rich session history combining analytics + transcriptions
+            const historyEntries = dbAnalytics.map((a: any) => ({
+                id: a.id,
+                date: a.created_at,
+                duration: a.duration || 0,
+                wordCount: a.word_count || 0,
+                mode: a.mode || 'Speech Practice',
+                language: a.language || 'en',
+                metadata: a.metadata || {}
+            }));
+            setSessionHistory(historyEntries);
 
             // 3. Compute Stats
             // Duration conversion to hours
@@ -165,31 +183,26 @@ export default function PatientDetailPage() {
             // Streak calculation
             let calculatedStreak = 0;
             if (dbAnalytics.length > 0) {
-                const uniqueDays = new Set(dbAnalytics.map(a => a.created_at.split('T')[0]));
-                const sortedDays = Array.from(uniqueDays).sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
-                
-                let currentStreak = 0;
+                const uniqueDays = new Set(dbAnalytics.map(a => a.created_at?.split('T')[0]).filter(Boolean));
                 const todayStr = new Date().toISOString().split('T')[0];
-                let lastCheckedDate = new Date(todayStr);
+                const yesterday = new Date();
+                yesterday.setDate(yesterday.getDate() - 1);
+                const yesterdayStr = yesterday.toISOString().split('T')[0];
 
-                const hasPracticedRecently = sortedDays.some(d => {
-                    const diff = Math.abs(new Date(todayStr).getTime() - new Date(d).getTime()) / (1000 * 60 * 60 * 24);
-                    return diff <= 1;
-                });
-
-                if (hasPracticedRecently) {
-                    for (let i = 0; i < sortedDays.length; i++) {
-                        const day = sortedDays[i];
-                        const diffDays = Math.round(Math.abs(lastCheckedDate.getTime() - new Date(day).getTime()) / (1000 * 60 * 60 * 24));
-                        if (diffDays <= 1) {
-                            currentStreak++;
-                            lastCheckedDate = new Date(day);
+                if (uniqueDays.has(todayStr) || uniqueDays.has(yesterdayStr)) {
+                    let streakVal = 0;
+                    const checkDate = uniqueDays.has(todayStr) ? new Date() : yesterday;
+                    while (true) {
+                        const dateStr = checkDate.toISOString().split('T')[0];
+                        if (uniqueDays.has(dateStr)) {
+                            streakVal++;
+                            checkDate.setDate(checkDate.getDate() - 1);
                         } else {
                             break;
                         }
                     }
+                    calculatedStreak = streakVal;
                 }
-                calculatedStreak = currentStreak || 1;
             }
             setStreak(calculatedStreak);
 
@@ -199,10 +212,13 @@ export default function PatientDetailPage() {
                 setAvgConfidence(Number((totalConf / dbTranscriptions.length).toFixed(2)));
             }
 
-            // Compliance
-            const completedExercises = dbAnalytics.filter(a => a.mode === 'streaming' || a.mode === 'batch').length;
-            const targetCount = Math.max(dbAnalytics.length, 5);
-            setCompliance(Math.round((completedExercises / targetCount) * 100));
+            // Compliance from patient_goals completed percentage
+            if (dbGoals.length > 0) {
+                const completedGoalsCount = dbGoals.filter((g: any) => g.completed).length;
+                setCompliance(Math.round((completedGoalsCount / dbGoals.length) * 100));
+            } else {
+                setCompliance(0);
+            }
 
         } catch (err) {
             console.error('Error loading patient detail:', err);
@@ -621,33 +637,52 @@ export default function PatientDetailPage() {
                     <div className="flex gap-2 border-b border-gray-100 pb-px mb-6 overflow-x-auto">
                         <button
                             onClick={() => setActiveTab('assignments')}
-                            className={`flex items-center gap-2 px-6 py-3 text-sm font-bold rounded-t-lg transition-all border-b-2 ${
+                            className={`flex items-center gap-2 px-5 py-3 text-sm font-bold rounded-t-lg transition-all border-b-2 ${
                                 activeTab === 'assignments' 
                                     ? 'border-[#CC0000] text-[#CC0000] bg-gray-50/50' 
                                     : 'border-transparent text-gray-500 hover:text-[#CC0000]'
                             }`}
                         >
+                            <Calendar size={14} />
                             Daily Assignments
                         </button>
                         <button
                             onClick={() => setActiveTab('journal')}
-                            className={`flex items-center gap-2 px-6 py-3 text-sm font-bold rounded-t-lg transition-all border-b-2 ${
+                            className={`flex items-center gap-2 px-5 py-3 text-sm font-bold rounded-t-lg transition-all border-b-2 ${
                                 activeTab === 'journal' 
                                     ? 'border-[#CC0000] text-[#CC0000] bg-gray-50/50' 
                                     : 'border-transparent text-gray-500 hover:text-[#CC0000]'
                             }`}
                         >
+                            <Volume2 size={14} />
                             Voice Journal
                         </button>
                         <button
                             onClick={() => setActiveTab('transcripts')}
-                            className={`flex items-center gap-2 px-6 py-3 text-sm font-bold rounded-t-lg transition-all border-b-2 ${
+                            className={`flex items-center gap-2 px-5 py-3 text-sm font-bold rounded-t-lg transition-all border-b-2 ${
                                 activeTab === 'transcripts' 
                                     ? 'border-[#CC0000] text-[#CC0000] bg-gray-50/50' 
                                     : 'border-transparent text-gray-500 hover:text-[#CC0000]'
                             }`}
                         >
-                            ASR Transcripts Log
+                            <MessageSquare size={14} />
+                            ASR Transcripts
+                        </button>
+                        <button
+                            onClick={() => setActiveTab('history')}
+                            className={`flex items-center gap-2 px-5 py-3 text-sm font-bold rounded-t-lg transition-all border-b-2 ${
+                                activeTab === 'history' 
+                                    ? 'border-[#CC0000] text-[#CC0000] bg-gray-50/50' 
+                                    : 'border-transparent text-gray-500 hover:text-[#CC0000]'
+                            }`}
+                        >
+                            <Activity size={14} />
+                            Session History
+                            {sessionHistory.length > 0 && (
+                                <span className="ml-1 text-[10px] font-bold bg-[#CC0000]/10 text-[#CC0000] px-1.5 py-0.5 rounded-full">
+                                    {sessionHistory.length}
+                                </span>
+                            )}
                         </button>
                     </div>
 
@@ -935,6 +970,170 @@ export default function PatientDetailPage() {
                                                     </td>
                                                 </tr>
                                             ))
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Session History Tab */}
+                    {activeTab === 'history' && (
+                        <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm">
+                            <div className="px-6 py-5 border-b border-gray-100 flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                    <Activity size={20} className="text-gray-400" />
+                                    <div>
+                                        <h2 className="text-lg font-bold text-gray-900 font-sans">Session Practice History</h2>
+                                        <p className="text-xs text-gray-400 mt-0.5">All practice sessions ordered by date</p>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                    <span className="text-xs bg-gray-50 text-gray-400 font-bold border border-gray-100 px-2 py-0.5 rounded-md">
+                                        {sessionHistory.length} sessions
+                                    </span>
+                                    <span className="text-xs bg-blue-50 text-blue-600 font-bold border border-blue-100 px-2 py-0.5 rounded-md">
+                                        {(sessionHistory.reduce((sum, s) => sum + (s.duration || 0), 0) / 3600).toFixed(1)} hrs total
+                                    </span>
+                                </div>
+                            </div>
+
+                            {/* Summary Stats Row */}
+                            {sessionHistory.length > 0 && (
+                                <div className="grid grid-cols-3 divide-x divide-gray-100 border-b border-gray-100">
+                                    <div className="px-6 py-4 text-center">
+                                        <p className="text-2xl font-bold text-gray-900">{sessionHistory.length}</p>
+                                        <p className="text-xs text-gray-400 font-semibold mt-0.5">Total Sessions</p>
+                                    </div>
+                                    <div className="px-6 py-4 text-center">
+                                        <p className="text-2xl font-bold text-gray-900">
+                                            {sessionHistory.reduce((sum, s) => sum + (s.wordCount || 0), 0).toLocaleString()}
+                                        </p>
+                                        <p className="text-xs text-gray-400 font-semibold mt-0.5">Words Practiced</p>
+                                    </div>
+                                    <div className="px-6 py-4 text-center">
+                                        <p className="text-2xl font-bold text-gray-900">
+                                            {Math.round(sessionHistory.reduce((sum, s) => sum + (s.duration || 0), 0) / 60)} min
+                                        </p>
+                                        <p className="text-xs text-gray-400 font-semibold mt-0.5">Total Practice Time</p>
+                                    </div>
+                                </div>
+                            )}
+
+                            <div className="overflow-x-auto">
+                                <table className="min-w-full">
+                                    <thead>
+                                        <tr className="border-b border-gray-100 bg-gray-50/50">
+                                            <th className="px-6 py-4 text-left text-[11px] font-bold text-gray-400 uppercase tracking-wider">Date & Time</th>
+                                            <th className="px-6 py-4 text-left text-[11px] font-bold text-gray-400 uppercase tracking-wider">Practice Mode</th>
+                                            <th className="px-6 py-4 text-left text-[11px] font-bold text-gray-400 uppercase tracking-wider">Language</th>
+                                            <th className="px-6 py-4 text-left text-[11px] font-bold text-gray-400 uppercase tracking-wider">Duration</th>
+                                            <th className="px-6 py-4 text-left text-[11px] font-bold text-gray-400 uppercase tracking-wider">Words</th>
+                                            <th className="px-6 py-4 text-left text-[11px] font-bold text-gray-400 uppercase tracking-wider">Performance</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-gray-50">
+                                        {sessionHistory.length === 0 ? (
+                                            <tr>
+                                                <td colSpan={6} className="px-6 py-12 text-center">
+                                                    <Activity className="w-10 h-10 text-gray-200 mx-auto mb-2" />
+                                                    <p className="text-sm text-gray-400 font-semibold">No practice sessions recorded yet.</p>
+                                                    <p className="text-xs text-gray-400 mt-1">Session history will appear here once the patient completes exercises.</p>
+                                                </td>
+                                            </tr>
+                                        ) : (
+                                            sessionHistory.map((session, index) => {
+                                                const modeColors: Record<string, string> = {
+                                                    PHRASE_GAME: 'bg-purple-100 text-purple-700',
+                                                    WORD_GAME: 'bg-blue-100 text-blue-700',
+                                                    TRANSCRIPT: 'bg-green-100 text-green-700',
+                                                    PHRASEBOARD: 'bg-orange-100 text-orange-700',
+                                                    JOURNAL: 'bg-pink-100 text-pink-700',
+                                                    CLINICAL_PRIORITY: 'bg-red-100 text-red-700',
+                                                    EMERGENCY: 'bg-red-100 text-red-700',
+                                                };
+                                                const modeLabels: Record<string, string> = {
+                                                    PHRASE_GAME: '🧩 Phrase Quest',
+                                                    WORD_GAME: '🎮 Word Game',
+                                                    TRANSCRIPT: '🎤 Live Speech',
+                                                    PHRASEBOARD: '💬 Phrase Board',
+                                                    JOURNAL: '📔 Voice Journal',
+                                                    CLINICAL_PRIORITY: '🚨 Priority Alert',
+                                                    EMERGENCY: '🆘 Emergency',
+                                                };
+                                                const modeClass = modeColors[session.mode] || 'bg-gray-100 text-gray-700';
+                                                const modeLabel = modeLabels[session.mode] || `📝 ${session.mode}`;
+                                                const langLabel = session.language === 'tw' || session.language === 'twi' ? 'Twi' : session.language === 'ga' ? 'Ga' : 'English';
+                                                const langClass = session.language === 'tw' || session.language === 'twi'
+                                                    ? 'bg-[#FFD700]/20 text-[#111111]'
+                                                    : session.language === 'ga'
+                                                    ? 'bg-[#008000]/10 text-[#008000]'
+                                                    : 'bg-[#CC0000]/10 text-[#CC0000]';
+                                                const durationMin = Math.floor((session.duration || 0) / 60);
+                                                const durationSec = Math.floor((session.duration || 0) % 60);
+                                                const durationStr = durationMin > 0
+                                                    ? `${durationMin}m ${durationSec}s`
+                                                    : `${durationSec}s`;
+                                                const incorrectAttempts = session.metadata?.incorrectAttempts || 0;
+                                                const struggles = session.metadata?.struggles?.length || 0;
+                                                const hasErrors = incorrectAttempts > 0 || struggles > 0;
+                                                return (
+                                                    <tr key={session.id} className={`hover:bg-gray-50/50 transition-colors ${index % 2 === 0 ? '' : 'bg-gray-50/20'}`}>
+                                                        <td className="px-6 py-4">
+                                                            <div>
+                                                                <p className="text-xs font-bold text-gray-900">
+                                                                    {new Date(session.date).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}
+                                                                </p>
+                                                                <p className="text-[10px] font-mono text-gray-400 mt-0.5">
+                                                                    {new Date(session.date).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
+                                                                </p>
+                                                            </div>
+                                                        </td>
+                                                        <td className="px-6 py-4">
+                                                            <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-bold ${modeClass}`}>
+                                                                {modeLabel}
+                                                            </span>
+                                                        </td>
+                                                        <td className="px-6 py-4">
+                                                            <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-bold ${langClass}`}>
+                                                                {langLabel}
+                                                            </span>
+                                                        </td>
+                                                        <td className="px-6 py-4">
+                                                            <div className="flex items-center gap-1.5">
+                                                                <Clock size={12} className="text-gray-400" />
+                                                                <span className="text-xs font-mono font-bold text-gray-600">{durationStr}</span>
+                                                            </div>
+                                                        </td>
+                                                        <td className="px-6 py-4">
+                                                            <div className="flex items-center gap-1.5">
+                                                                <div className="w-16 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                                                                    <div 
+                                                                        className="h-full bg-[#008000] rounded-full" 
+                                                                        style={{ width: `${Math.min((session.wordCount || 0) / 50 * 100, 100)}%` }} 
+                                                                    />
+                                                                </div>
+                                                                <span className="text-xs font-mono font-bold text-gray-500">
+                                                                    {(session.wordCount || 0).toLocaleString()}
+                                                                </span>
+                                                            </div>
+                                                        </td>
+                                                        <td className="px-6 py-4">
+                                                            {hasErrors ? (
+                                                                <span className="inline-flex items-center gap-1 text-xs font-bold text-red-600 bg-red-50 px-2 py-0.5 rounded">
+                                                                    <ShieldAlert size={10} />
+                                                                    {incorrectAttempts + struggles} error{(incorrectAttempts + struggles) > 1 ? 's' : ''}
+                                                                </span>
+                                                            ) : (
+                                                                <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded">
+                                                                    <CheckCircle2 size={10} />
+                                                                    Clean session
+                                                                </span>
+                                                            )}
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })
                                         )}
                                     </tbody>
                                 </table>

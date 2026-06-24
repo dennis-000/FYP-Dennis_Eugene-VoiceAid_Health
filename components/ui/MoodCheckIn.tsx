@@ -21,18 +21,41 @@ interface MoodCheckInProps {
     scale?: number;
 }
 
+let hasSpokenMoodGreetingTodayGlobal = false;
+
 export const MoodCheckIn: React.FC<MoodCheckInProps> = ({ patientId, colors, language, scale = 1 }) => {
     const tr = useT(language as any);
+    const [loading, setLoading] = useState(true);
     const [alreadyLogged, setAlreadyLogged] = useState(false);
     const [selectedMood, setSelectedMood] = useState<number | null>(null);
     const [saving, setSaving] = useState(false);
-    const hasSpokenRef = React.useRef(false);
+
+    const todayKey = () => {
+        const d = new Date();
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    };
+
+    // Load logged status on mount
+    useEffect(() => {
+        const checkStatus = async () => {
+            try {
+                const lastDate = await AsyncStorage.getItem('@voiceaid_last_mood_date');
+                const logged = lastDate === todayKey();
+                setAlreadyLogged(logged);
+            } catch (err) {
+                console.error('[MoodCheckIn] Error reading status:', err);
+            } finally {
+                setLoading(false);
+            }
+        };
+        checkStatus();
+    }, []);
 
     // TTS greeting when card appears for the first time today
     useEffect(() => {
-        if (!alreadyLogged && !hasSpokenRef.current) {
+        if (!loading && !alreadyLogged && !hasSpokenMoodGreetingTodayGlobal) {
             const greeting = tr('dailyMoodGreeting');
-            hasSpokenRef.current = true;
+            hasSpokenMoodGreetingTodayGlobal = true;
             
             // Small delay so the UI renders first
             const timer = setTimeout(() => {
@@ -41,19 +64,7 @@ export const MoodCheckIn: React.FC<MoodCheckInProps> = ({ patientId, colors, lan
             
             return () => clearTimeout(timer);
         }
-    }, [alreadyLogged]);
-
-    const todayKey = () => {
-        const d = new Date();
-        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-    };
-
-    const checkIfLoggedToday = async () => {
-        const lastDate = await AsyncStorage.getItem('@voiceaid_last_mood_date');
-        if (lastDate === todayKey()) {
-            setAlreadyLogged(true);
-        }
-    };
+    }, [loading, alreadyLogged, language]);
 
     const handleMoodSelect = async (level: number) => {
         if (!patientId || saving) return;
@@ -88,8 +99,8 @@ export const MoodCheckIn: React.FC<MoodCheckInProps> = ({ patientId, colors, lan
         }
     };
 
-    // Don't render if already logged today
-    if (alreadyLogged) {
+    // Don't render if loading or already logged today
+    if (loading || alreadyLogged) {
         return null;
     }
 

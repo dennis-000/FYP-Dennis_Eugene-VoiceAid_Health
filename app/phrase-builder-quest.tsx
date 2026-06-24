@@ -302,9 +302,8 @@ export default function PhraseBuilderQuestScreen() {
             setGameOver(true);
             haptics.success();
             
-            // Speak the completed correct sentence
             const textToSpeak = selectedWords.join(' ');
-            const langCode = language === 'twi' ? 'twi' : 'en';
+            const langCode = language === 'twi' ? 'twi' : language === 'ga' ? 'ga' : 'en';
             try {
                 await TTSService.speak(textToSpeak, langCode as any);
             } catch (e) {

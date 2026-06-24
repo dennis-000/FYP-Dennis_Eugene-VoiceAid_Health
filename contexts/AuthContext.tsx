@@ -1,6 +1,7 @@
 import { Session, User } from '@supabase/supabase-js';
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { supabase } from '../lib/supabase';
+import { NotificationService } from '../services/notificationService';
 
 // User type definitions
 export type UserType = 'therapist' | 'patient' | null;
@@ -68,6 +69,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const [therapistProfile, setTherapistProfile] = useState<TherapistProfile | null>(null);
     const [patientProfile, setPatientProfile] = useState<PatientProfile | null>(null);
     const [loading, setLoading] = useState(true);
+    // Guard: only register push token once per app session
+    const pushTokenRegistered = useRef(false);
 
     useEffect(() => {
         // Get initial session
@@ -131,17 +134,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 .single();
 
             if (error) {
-                console.error('Error loading therapist profile:', error);
+                if (error.code !== 'PGRST116') {
+                    console.error('Error loading therapist profile:', error);
+                }
                 return;
             }
 
             setTherapistProfile(data);
 
-            // Register for Push Notifications (Background Alerts)
-            const { NotificationService } = await import('../services/notificationService');
-            const token = await NotificationService.registerForPushNotificationsAsync();
-            if (token && data.id) {
-                await NotificationService.saveTokenToBackend(data.id, token);
+            // Register for Push Notifications — only once per session
+            try {
+                if (!pushTokenRegistered.current) {
+                    const token = await NotificationService.registerForPushNotificationsAsync();
+                    if (token && data.id) {
+                        pushTokenRegistered.current = true;
+                        await NotificationService.saveTokenToBackend(data.id, token);
+                    }
+                }
+            } catch (pushErr) {
+                console.warn('Push registration warning:', pushErr);
             }
         } catch (error) {
             console.error('Error loading therapist profile:', error);
@@ -158,17 +169,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 .single();
 
             if (error) {
-                console.error('Error loading patient profile:', error);
+                if (error.code !== 'PGRST116') {
+                    console.error('Error loading patient profile:', error);
+                }
                 return;
             }
 
             setPatientProfile(data);
             
-            // Register for Push Notifications (Background Alerts) for patients
-            const { NotificationService } = await import('../services/notificationService');
-            const token = await NotificationService.registerForPushNotificationsAsync();
-            if (token && data.id) {
-                await NotificationService.savePatientTokenToBackend(data.id, token);
+            // Register for Push Notifications — only once per session
+            try {
+                if (!pushTokenRegistered.current) {
+                    const token = await NotificationService.registerForPushNotificationsAsync();
+                    if (token && data.id) {
+                        pushTokenRegistered.current = true;
+                        await NotificationService.savePatientTokenToBackend(data.id, token);
+                    }
+                }
+            } catch (pushErr) {
+                console.warn('Push registration warning:', pushErr);
             }
         } catch (error) {
             console.error('Error loading patient profile:', error);

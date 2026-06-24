@@ -30,6 +30,8 @@ image = (
         "accelerate==0.34.0",
         "librosa==0.10.2",
         "numpy==1.26.4",
+        "google-generativeai>=0.7.0",
+        "huggingface_hub>=0.24.0",
     )
     .apt_install("ffmpeg")  # Required by pydub for audio processing
 )
@@ -46,6 +48,7 @@ image = (
 @modal.asgi_app()
 def fastapi_app():
     import torch
+    import asyncio
     import numpy as np
     import scipy.io.wavfile
     from fastapi import FastAPI, UploadFile, File, Form, WebSocket, WebSocketDisconnect
@@ -149,12 +152,29 @@ def fastapi_app():
     def load_tts(lang_code):
         if lang_code in tts_models:
             return tts_models[lang_code]
-        model_id = 'facebook/mms-tts-aka' if lang_code == 'tw' else 'facebook/mms-tts-eng'
+        if lang_code in ['tw', 'twi', 'akan']:
+            model_id = 'facebook/mms-tts-aka'
+        elif lang_code in ['ga', 'gaa']:
+            model_id = 'facebook/mms-tts-gaa'
+        else:
+            model_id = 'facebook/mms-tts-eng'
         print(f'🌟 Loading TTS ({model_id})...')
-        model     = VitsModel.from_pretrained(model_id).to(DEVICE)
-        tokenizer = AutoTokenizer.from_pretrained(model_id)
-        tts_models[lang_code] = (model, tokenizer)
-        return model, tokenizer
+        try:
+            model     = VitsModel.from_pretrained(model_id).to(DEVICE)
+            tokenizer = AutoTokenizer.from_pretrained(model_id)
+            tts_models[lang_code] = (model, tokenizer)
+            return model, tokenizer
+        except Exception as e:
+            print(f"⚠️ [TTS Error] Failed to load model {model_id}: {e}")
+            fallback_model_id = 'facebook/mms-tts-eng'
+            print(f"🔄 Falling back to {fallback_model_id}")
+            if fallback_model_id in tts_models:
+                return tts_models[fallback_model_id]
+            model     = VitsModel.from_pretrained(fallback_model_id).to(DEVICE)
+            tokenizer = AutoTokenizer.from_pretrained(fallback_model_id)
+            tts_models[fallback_model_id] = (model, tokenizer)
+            tts_models[lang_code] = (model, tokenizer)
+            return model, tokenizer
 
     def load_llm():
         nonlocal llm_model, llm_tok
@@ -293,16 +313,50 @@ def fastapi_app():
         difficulty: str
 
     def query_hf_llm(prompt: str, max_tokens: int = 250, temperature: float = 0.3) -> str:
-        """Helper to query Hugging Face Serverless Inference API with fallback models."""
+        """Query LLM with Google Gemini as primary, HuggingFace as fallback."""
+        import os
+
+        # ── Layer 0: Try Google Gemini (best quality) ────────────────────────────
+        gemini_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
+        if gemini_key:
+            try:
+                import google.generativeai as genai
+                genai.configure(api_key=gemini_key)
+                # Try listing models to get the exact matching identifier for this key/region
+                model_to_use = 'gemini-1.5-flash'
+                try:
+                    available = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+                    if available:
+                        # Match case-insensitively for gemini-1.5-flash
+                        flash_models = [name for name in available if 'gemini-1.5-flash' in name.lower()]
+                        if flash_models:
+                            model_to_use = flash_models[0]
+                        else:
+                            # Fallback to any model containing 'gemini'
+                            any_gemini = [name for name in available if 'gemini' in name.lower()]
+                            if any_gemini:
+                                model_to_use = any_gemini[0]
+                except Exception as list_err:
+                    print(f"[AI Backend] ⚠️ Could not list Gemini models dynamically, using default name: {list_err}")
+
+                print(f"[AI Backend] Using GenerativeModel: {model_to_use}")
+                gemini_model = genai.GenerativeModel(model_to_use)
+                response = gemini_model.generate_content(
+                    prompt,
+                    generation_config=genai.types.GenerationConfig(
+                        max_output_tokens=max_tokens,
+                        temperature=temperature,
+                    )
+                )
+                if response and response.text and response.text.strip():
+                    print(f"[AI Backend] ✅ Gemini ({model_to_use}) responded successfully")
+                    return response.text.strip()
+            except Exception as e:
+                print(f"[AI Backend] ⚠️ Gemini failed, falling back to HuggingFace: {e}")
+
+        # ── Layer 1: Fallback to Hugging Face Serverless API ─────────────────────
         import urllib.request
         import json
-        import os
-        
-        # This will try Qwen model first, but it keep failing so it will fallback to Llama-3.2 if it fails
-        models = [
-            "https://api-inference.huggingface.co/models/Qwen/Qwen2.5-7B-Instruct",
-            "https://api-inference.huggingface.co/models/meta-llama/Llama-3.2-3B-Instruct"
-        ]
         
         token = os.environ.get("HF_TOKEN") or os.environ.get("HUGGINGFACE_CO_RESOLVE_PROVIDER") or os.environ.get("HF_API_KEY")
         headers = {
@@ -311,19 +365,43 @@ def fastapi_app():
         if token:
             headers["Authorization"] = f"Bearer {token}"
             
-        payload = {
-            "inputs": prompt,
-            "parameters": {
-                "max_new_tokens": max_tokens,
-                "temperature": temperature,
-                "return_full_text": False
-            }
-        }
-        data_bytes = json.dumps(payload).encode("utf-8")
+        models = [
+            "Qwen/Qwen2.5-7B-Instruct",
+            "meta-llama/Llama-3.2-3B-Instruct"
+        ]
         
-        for url in models:
+        for model_name in models:
+            # Try chat completions endpoint first
+            chat_url = f"https://api-inference.huggingface.co/models/{model_name}/v1/chat/completions"
+            chat_payload = {
+                "messages": [{"role": "user", "content": prompt}],
+                "max_tokens": max_tokens,
+                "temperature": temperature
+            }
             try:
-                req = urllib.request.Request(url, data=data_bytes, headers=headers, method="POST")
+                data_bytes = json.dumps(chat_payload).encode("utf-8")
+                req = urllib.request.Request(chat_url, data=data_bytes, headers=headers, method="POST")
+                with urllib.request.urlopen(req, timeout=10) as response:
+                    res_json = json.loads(response.read().decode("utf-8"))
+                    text = res_json.get("choices", [{}])[0].get("message", {}).get("content", "").strip()
+                    if text:
+                        return text
+            except Exception as e:
+                print(f"[AI Backend] Warning: chat request failed for {model_name} via urllib: {e}")
+
+            # Fall back to text generation endpoint
+            text_url = f"https://api-inference.huggingface.co/models/{model_name}"
+            text_payload = {
+                "inputs": prompt,
+                "parameters": {
+                    "max_new_tokens": max_tokens,
+                    "temperature": temperature,
+                    "return_full_text": False
+                }
+            }
+            try:
+                data_bytes = json.dumps(text_payload).encode("utf-8")
+                req = urllib.request.Request(text_url, data=data_bytes, headers=headers, method="POST")
                 with urllib.request.urlopen(req, timeout=10) as response:
                     res_json = json.loads(response.read().decode("utf-8"))
                     if isinstance(res_json, list) and len(res_json) > 0:
@@ -335,8 +413,7 @@ def fastapi_app():
                         if text:
                             return text
             except Exception as e:
-                print(f"[AI Backend] Warning: LLM query failed for {url}: {e}")
-                continue
+                print(f"[AI Backend] Warning: text request failed for {model_name} via urllib: {e}")
                 
         raise RuntimeError("All inference model APIs are unreachable or timed out.")
 
@@ -698,12 +775,38 @@ def fastapi_app():
         language: str = 'tw'
 
     @backend.post('/tts/synthesize')
-    @backend.get('/tts/synthesize')
-    async def synthesize(request_or_text = '', language: str = 'tw'):
-        text = request_or_text.text if hasattr(request_or_text, 'text') else request_or_text
-        lang_id = 'tw' if language in ['tw', 'twi', 'akan'] else 'eng'
+    async def synthesize_post(req: TTSRequest):
+        if req.language in ['ga', 'gaa']:
+            lang_id = 'ga'
+        elif req.language in ['tw', 'twi', 'akan']:
+            lang_id = 'tw'
+        else:
+            lang_id = 'eng'
         model, tokenizer = load_tts(lang_id)
-        inputs = tokenizer(text, return_tensors='pt').to(DEVICE)
+        inputs = tokenizer(req.text, return_tensors='pt')
+        inputs = {k: (v.to(DEVICE).long() if k in ['input_ids', 'attention_mask'] else v.to(DEVICE)) for k, v in inputs.items()}
+        with torch.no_grad():
+            output = model(**inputs).waveform
+        audio_np = output.squeeze().cpu().numpy()
+        sr       = model.config.sampling_rate
+        audio_np = np.pad(audio_np, (0, int(0.5 * sr)), mode='constant')
+        audio_np = (audio_np * 32767.0).astype(np.int16)
+        audio_io = io.BytesIO()
+        scipy.io.wavfile.write(audio_io, sr, audio_np)
+        audio_io.seek(0)
+        return StreamingResponse(audio_io, media_type='audio/wav')
+
+    @backend.get('/tts/synthesize')
+    async def synthesize_get(text: str = '', language: str = 'tw'):
+        if language in ['ga', 'gaa']:
+            lang_id = 'ga'
+        elif language in ['tw', 'twi', 'akan']:
+            lang_id = 'tw'
+        else:
+            lang_id = 'eng'
+        model, tokenizer = load_tts(lang_id)
+        inputs = tokenizer(text, return_tensors='pt')
+        inputs = {k: (v.to(DEVICE).long() if k in ['input_ids', 'attention_mask'] else v.to(DEVICE)) for k, v in inputs.items()}
         with torch.no_grad():
             output = model(**inputs).waveform
         audio_np = output.squeeze().cpu().numpy()

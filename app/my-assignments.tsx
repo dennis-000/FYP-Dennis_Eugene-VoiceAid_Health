@@ -439,13 +439,13 @@ export default function MyAssignmentsScreen() {
                                 borderWidth: 2,
                                 alignItems: 'center',
                                 backgroundColor: isSelected ? colors.primary : colors.card,
-                                borderColor: isSelected ? colors.primary : 'transparent',
+                                borderColor: isSelected ? colors.primary : colors.border,
                             }}
                         >
                             <Text style={{
                                 fontSize: 13,
                                 fontWeight: '600',
-                                color: isSelected ? '#fff' : isT ? colors.primary : colors.subText,
+                                color: isSelected ? (colors.bg === '#111111' ? '#111111' : '#fff') : (isT ? colors.primary : colors.subText),
                             }}>
                                 {formatDateLabel(date)}
                             </Text>

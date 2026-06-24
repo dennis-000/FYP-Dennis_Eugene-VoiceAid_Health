@@ -14,6 +14,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useT } from '../utils/i18n';
 import { HistoryService } from '../services/historyService';
 import KenteAccent from '../components/KenteAccent';
+import GhanaKeyboardHelper from '../components/GhanaKeyboardHelper';
 
 
 type Category = 'All' | 'Basic Needs' | 'Medical' | 'Social' | 'Custom';
@@ -21,57 +22,57 @@ type Category = 'All' | 'Basic Needs' | 'Medical' | 'Social' | 'Custom';
 // Default phrases with categories including early childhood words and advanced everyday vocab
 const DEFAULT_PHRASES = [
     // Early Words & Social (Highly recognized Ga/Twi foundational communication)
-    { id: 'default-early-1', category: 'Social',       text: 'Mother',       twi: 'Maa',         ga: 'Maa',       icon: 'people',            color: '#22c55e' },
-    { id: 'default-early-2', category: 'Social',       text: 'Father',       twi: 'Agya',        ga: 'Daa',       icon: 'people',            color: '#3b82f6' },
+    { id: 'default-early-1', category: 'Social',       text: 'Mother',       twi: 'Maa',         ga: 'Awo',       icon: 'people',            color: '#22c55e' },
+    { id: 'default-early-2', category: 'Social',       text: 'Father',       twi: 'Agya',        ga: 'Ataa',      icon: 'people',            color: '#3b82f6' },
     { id: 'default-early-3', category: 'Social',       text: 'Come',         twi: 'Bra',         ga: 'Ba',        icon: 'arrow-redo',        color: '#10b981' },
     { id: 'default-early-4', category: 'Social',       text: 'Go',           twi: 'Kɔ',          ga: 'Yaa',       icon: 'arrow-undo',        color: '#ef4444' },
     
     // Social / Everyday
-    { id: 'default-1',  category: 'Social',       text: 'Hello',        twi: 'Agoo',        ga: 'Ojekoo',    icon: 'hand-left',         color: '#3b82f6' },
+    { id: 'default-1',  category: 'Social',       text: 'Hello',        twi: 'Agoo',        ga: 'Miihaao',    icon: 'hand-left',         color: '#3b82f6' },
     { id: 'default-7',  category: 'Social',       text: 'Yes',          twi: 'Aane',        ga: 'Hɛɛ',      icon: 'checkmark-circle',  color: '#22c55e' },
     { id: 'default-8',  category: 'Social',       text: 'No',           twi: 'Daabi',       ga: 'Daabi',     icon: 'close-circle',      color: '#ef4444' },
-    { id: 'default-9',  category: 'Social',       text: 'Thank you',    twi: 'Medaase',     ga: 'Oyiwala',   icon: 'heart',             color: '#ec4899' },
-    { id: 'default-13', category: 'Social',       text: 'Please',       twi: 'Mepa wo kyɛw', ga: 'Paai',   icon: 'hand-right',        color: '#8b5cf6' },
-    { id: 'default-14', category: 'Social',       text: 'Goodbye',      twi: 'Nante yie',   ga: 'Ogbuoi',   icon: 'exit',              color: '#64748b' },
+    { id: 'default-9',  category: 'Social',       text: 'Thank you',    twi: 'Medaase',     ga: 'Oyiwaladɔŋŋ', icon: 'heart',             color: '#ec4899' },
+    { id: 'default-13', category: 'Social',       text: 'Please',       twi: 'Mepa wo kyɛw', ga: 'Ofainɛ',   icon: 'hand-right',        color: '#8b5cf6' },
+    { id: 'default-14', category: 'Social',       text: 'Goodbye',      twi: 'Nante yie',   ga: 'Yaaba',   icon: 'exit',              color: '#64748b' },
 
     // Basic Needs
     { id: 'default-2',  category: 'Basic Needs',  text: 'Water',        twi: 'Nsuo',        ga: 'Nu',       icon: 'water',             color: '#0ea5e9' },
-    { id: 'default-3',  category: 'Basic Needs',  text: 'Food',         twi: 'Aduane',      ga: 'Ammm',     icon: 'fast-food',         color: '#f59e0b' },
-    { id: 'default-5',  category: 'Basic Needs',  text: 'Toilet',       twi: 'Restroom',    ga: 'Restroom', icon: 'male',              color: '#8b5cf6' },
-    { id: 'default-10', category: 'Basic Needs',  text: 'Sleep',        twi: 'Da',          ga: 'Hee',      icon: 'bed',               color: '#6366f1' },
-    { id: 'default-15', category: 'Basic Needs',  text: 'Cold',         twi: 'Awɔ',         ga: 'Petee',    icon: 'snow',              color: '#06b6d4' },
-    { id: 'default-16', category: 'Basic Needs',  text: 'Hot',          twi: 'Ehyew',       ga: 'Ke',       icon: 'flame',             color: '#f97316' },
+    { id: 'default-3',  category: 'Basic Needs',  text: 'Food',         twi: 'Aduane',      ga: 'Niyenii',     icon: 'fast-food',         color: '#f59e0b' },
+    { id: 'default-5',  category: 'Basic Needs',  text: 'Toilet',       twi: 'Restroom',    ga: 'Niiasee', icon: 'male',              color: '#8b5cf6' },
+    { id: 'default-10', category: 'Basic Needs',  text: 'Sleep',        twi: 'Da',          ga: 'Wɔ',      icon: 'bed',               color: '#6366f1' },
+    { id: 'default-15', category: 'Basic Needs',  text: 'Cold',         twi: 'Awɔ',         ga: 'Fɛi',    icon: 'snow',              color: '#06b6d4' },
+    { id: 'default-16', category: 'Basic Needs',  text: 'Hot',          twi: 'Ehyew',       ga: 'Dɔ',       icon: 'flame',             color: '#f97316' },
     
     // Advanced Everyday Needs (Social / Basic Needs)
     { id: 'default-adv-1', category: 'Basic Needs', text: 'I am hungry',  twi: 'Ɔkɔm de me',   ga: 'Hɔmɔ yeɔ mi',icon: 'restaurant',       color: '#f59e0b' },
     { id: 'default-adv-2', category: 'Basic Needs', text: 'I am thirsty', twi: 'Sukɔm de me',  ga: 'Kumai yeɔ mi',icon: 'beer',              color: '#0ea5e9' },
-    { id: 'default-adv-3', category: 'Social',      text: 'I want to go home', twi: 'Mepɛ sɛ mekɔ fie', ga: 'Miisuɔ ni maya shia', icon: 'home', color: '#10b981' },
-    { id: 'default-adv-4', category: 'Social',      text: 'Call my family', twi: 'Frɛ m\'abusua', ga: 'Frɛ mi wekumɛi', icon: 'call',       color: '#a855f7' },
-    { id: 'default-adv-3a', category: 'Basic Needs', text: 'I want to wash my hands', twi: 'Mepɛ sɛ mehohoro me nsa', ga: 'Miisuɔ mafɔ miniji', icon: 'hand-left', color: '#06b6d4' },
-    { id: 'default-adv-3b', category: 'Basic Needs', text: 'Where is the toilet?', twi: 'Teepee no wɔ he?', ga: 'Nɛgbɛ shia yɔɔ?', icon: 'location', color: '#8b5cf6' },
+    { id: 'default-adv-3', category: 'Social',      text: 'I want to go home', twi: 'Mepɛ sɛ mekɔ fie', ga: 'Miisumɔ ni maya shia', icon: 'home', color: '#10b981' },
+    { id: 'default-adv-4', category: 'Social',      text: 'Call my family', twi: 'Frɛ m\'abusua', ga: 'Tsɛmɔ mi wekumɛi', icon: 'call',       color: '#a855f7' },
+    { id: 'default-adv-3a', category: 'Basic Needs', text: 'I want to wash my hands', twi: 'Mepɛ sɛ mehohoro me nsa', ga: 'Miisumɔ mafɔ miniji', icon: 'hand-left', color: '#06b6d4' },
+    { id: 'default-adv-3b', category: 'Basic Needs', text: 'Where is the toilet?', twi: 'Restroom no wɔ he?', ga: 'Nɛgbɛ niiasee lɛ yɔɔ?', icon: 'location', color: '#8b5cf6' },
     { id: 'default-adv-3c', category: 'Basic Needs', text: 'I am tired', twi: 'Mabrɛ', ga: 'Etɔ mi', icon: 'bed', color: '#64748b' },
-    { id: 'default-adv-3d', category: 'Basic Needs', text: 'I want to bathe', twi: 'Mepɛ sɛ meguare', ga: 'Miisuɔ mawu', icon: 'water', color: '#3b82f6' },
-    { id: 'default-adv-3e', category: 'Social',      text: 'I need my phone', twi: 'Mepɛ me tɛlɛfoon', ga: 'Miisuɔ mitao mitelefon', icon: 'phone-portrait', color: '#09f' },
+    { id: 'default-adv-3d', category: 'Basic Needs', text: 'I want to bathe', twi: 'Mepɛ sɛ meguare', ga: 'Miisumɔ mawu', icon: 'water', color: '#3b82f6' },
+    { id: 'default-adv-3e', category: 'Social',      text: 'I need my phone', twi: 'Mepɛ me tɛlɛfoon', ga: 'Miisumɔ mitelefon', icon: 'phone-portrait', color: '#09f' },
 
     // Medical
-    { id: 'default-6',  category: 'Medical',      text: 'Pain',         twi: 'Me yare',     ga: 'Obuu',     icon: 'medkit',            color: '#ef4444' },
-    { id: 'default-4',  category: 'Medical',      text: 'Help',         twi: 'Boa me',      ga: 'Boa mi',   icon: 'alert-circle',      color: '#dc2626' },
-    { id: 'default-11', category: 'Medical',      text: 'Doctor',       twi: 'Dɔkota',      ga: 'Dɔkɔta',   icon: 'medkit',            color: '#10b981' },
-    { id: 'default-12', category: 'Medical',      text: 'Medicine',     twi: 'Adura',       ga: 'Tsofã',    icon: 'flask',             color: '#0d9488' },
-    { id: 'default-17', category: 'Medical',      text: 'Call Nurse',   twi: 'Frɛ okyɛfa',  ga: 'Frɛ boa',  icon: 'call',              color: '#7c3aed' },
-    { id: 'default-18', category: 'Medical',      text: 'Dizzy',        twi: 'Me ti repin', ga: 'Pebi',     icon: 'warning',           color: '#d97706' },
-    { id: 'default-19', category: 'Medical',      text: 'Nausea',       twi: 'Me yafunu yare', ga: 'Yafunu', icon: 'sad',              color: '#92400e' },
-    { id: 'default-20', category: 'Medical',      text: 'Happy',        twi: 'Me ani gye',  ga: 'Obiaa',    icon: 'happy',             color: '#f59e0b' },
-    { id: 'default-adv-m1', category: 'Medical',    text: 'Can you help me?', twi: 'Wobɛtumi aboa me?', ga: 'Anya boa mi?', icon: 'help-buoy', color: '#22c55e' },
+    { id: 'default-6',  category: 'Medical',      text: 'Pain',         twi: 'Me ho yɛ me yaw', ga: 'Mihe waɔ mi', icon: 'medkit',            color: '#ef4444' },
+    { id: 'default-4',  category: 'Medical',      text: 'Help',         twi: 'Boa me',      ga: 'Wa mi',   icon: 'alert-circle',      color: '#dc2626' },
+    { id: 'default-11', category: 'Medical',      text: 'Doctor',       twi: 'Dɔkota',      ga: 'Dokta',   icon: 'medkit',            color: '#10b981' },
+    { id: 'default-12', category: 'Medical',      text: 'Medicine',     twi: 'Aduro',       ga: 'Tsofa',    icon: 'flask',             color: '#0d9488' },
+    { id: 'default-17', category: 'Medical',      text: 'Call Nurse',   twi: 'Frɛ okyɛfa',  ga: 'Tsɛmɔ nɔɔse lɛ',  icon: 'call',              color: '#7c3aed' },
+    { id: 'default-18', category: 'Medical',      text: 'Dizzy',        twi: 'Me ti repin', ga: 'Mi yitso feɔ mi saŋŋ', icon: 'warning',      color: '#d97706' },
+    { id: 'default-19', category: 'Medical',      text: 'Nausea',       twi: 'Me yafunu yare', ga: 'Miiyaakɔ', icon: 'sad',              color: '#92400e' },
+    { id: 'default-20', category: 'Medical',      text: 'Happy',        twi: 'Me ani gye',  ga: 'Miishɛɛ',    icon: 'happy',             color: '#f59e0b' },
+    { id: 'default-adv-m1', category: 'Medical',    text: 'Can you help me?', twi: 'Wobɛtumi aboa me?', ga: 'Obaatumi owa mi?', icon: 'help-buoy', color: '#22c55e' },
     
     // Advanced Everyday Medical & Social
-    { id: 'default-adv-5', category: 'Medical',      text: 'My head hurts', twi: 'Me ti pae me', ga: 'Me yitsɔ yeɔ mi', icon: 'sad-outline',  color: '#ef4444' },
-    { id: 'default-adv-6', category: 'Medical',      text: 'Give me medicine', twi: 'Ma me aduro', ga: 'Kɛ tsofã ha mi', icon: 'pulse',      color: '#10b981' },
-    { id: 'default-adv-5a', category: 'Medical',      text: 'I am feeling better', twi: 'Mete nka sɛ meyɛ', ga: 'Minuɔ he akɛ miiye kpakpa', icon: 'checkmark-circle', color: '#22c55e' },
-    { id: 'default-adv-6a', category: 'Social',       text: 'Thank you very much', twi: 'Medaase pii', ga: 'Oyiwala donnn', icon: 'heart', color: '#ec4899' },
-    { id: 'default-adv-6b', category: 'Social',       text: 'Please sit down', twi: 'Mepa wo kyɛw tena ase', ga: 'Ofani ta shi', icon: 'body', color: '#3b82f6' },
+    { id: 'default-adv-5', category: 'Medical',      text: 'My head hurts', twi: 'Me ti pae me', ga: 'Mi yitso yeɔ mi', icon: 'sad-outline',  color: '#ef4444' },
+    { id: 'default-adv-6', category: 'Medical',      text: 'Give me medicine', twi: 'Ma me aduro', ga: 'Kɛ tsofa ha mi', icon: 'pulse',      color: '#10b981' },
+    { id: 'default-adv-5a', category: 'Medical',      text: 'I am feeling better', twi: 'Mete nka sɛ meyɛ', ga: 'Minuɔ he kpakpa', icon: 'checkmark-circle', color: '#22c55e' },
+    { id: 'default-adv-6a', category: 'Social',       text: 'Thank you very much', twi: 'Medaase pii', ga: 'Oyiwaladɔŋŋ', icon: 'heart', color: '#ec4899' },
+    { id: 'default-adv-6b', category: 'Social',       text: 'Please sit down', twi: 'Mepa wo kyɛw tena ase', ga: 'Ofainɛ ta shi', icon: 'body', color: '#3b82f6' },
     { id: 'default-adv-6c', category: 'Social',       text: 'Where are you going?', twi: 'Worekɔ he?', ga: 'Nɛgbɛ oyaa?', icon: 'walk', color: '#8b5cf6' },
-    { id: 'default-adv-6d', category: 'Social',       text: 'What is the time?', twi: 'Dɔn ben na abɔ?', ga: 'Mɛi ŋmɛlɛ ji?', icon: 'time', color: '#0ea5e9' },
+    { id: 'default-adv-6d', category: 'Social',       text: 'What is the time?', twi: 'Dɔn ben na abɔ?', ga: 'Mɛni ŋmɛlɛ ji?', icon: 'time', color: '#0ea5e9' },
 ];
 
 const CATEGORIES: Category[] = ['All', 'Basic Needs', 'Medical', 'Social', 'Custom'];
@@ -98,6 +99,10 @@ export default function PhraseboardScreen() {
     const [isModalVisible, setModalVisible] = useState(false);
     const [newPhraseText, setNewPhraseText] = useState('');
     const [newPhraseTwi, setNewPhraseTwi] = useState('');
+    const [newPhraseGa, setNewPhraseGa] = useState('');
+    const [twiSelection, setTwiSelection] = useState({ start: 0, end: 0 });
+    const [gaSelection, setGaSelection] = useState({ start: 0, end: 0 });
+
     const [newPhraseImageUri, setNewPhraseImageUri] = useState<string | null>(null);
     const [isSaving, setIsSaving] = useState(false);
     const [isUploadingImage, setIsUploadingImage] = useState(false);
@@ -163,8 +168,12 @@ export default function PhraseboardScreen() {
 
     const handleSpeak = async (phrase: any) => {
         setSpeakingId(phrase.id);
-        const textToSpeak = language === 'twi' ? (phrase.twi || phrase.twi_translation || phrase.text) : phrase.text;
-        const langCode = language === 'twi' ? 'twi' : 'en';
+        const textToSpeak = language === 'twi' 
+            ? (phrase.twi || phrase.twi_translation || phrase.text) 
+            : language === 'ga' 
+                ? (phrase.ga || phrase.text) 
+                : phrase.text;
+        const langCode = language === 'twi' ? 'twi' : language === 'ga' ? 'ga' : 'en';
         const speedMapping = { slow: 0.8, normal: 1.0, fast: 1.2 };
 
         try {
@@ -231,11 +240,13 @@ export default function PhraseboardScreen() {
         icon = fallback.icon;
         color = fallback.color;
 
+        const compoundTranslation = `${newPhraseTwi.trim()}|${newPhraseGa.trim()}`;
+
         const newPhrase = await PhraseService.addPhrase(
             patientId,
             therapistProfile.id,
             newPhraseText.trim(),
-            newPhraseTwi.trim() || null,
+            compoundTranslation,
             icon,
             color,
             uploadedImageUrl
@@ -246,6 +257,7 @@ export default function PhraseboardScreen() {
             setModalVisible(false);
             setNewPhraseText('');
             setNewPhraseTwi('');
+            setNewPhraseGa('');
             setNewPhraseImageUri(null);
             loadPhrases();
             setActiveCategory('Custom');
@@ -275,15 +287,22 @@ export default function PhraseboardScreen() {
     // Combine default and custom phrases
     const allPhrases = [
         ...DEFAULT_PHRASES,
-        ...customPhrases.map(cp => ({
-            id: cp.id,
-            category: 'Custom',
-            text: cp.text,
-            twi: cp.twi_translation || '',
-            icon: cp.icon,
-            color: cp.color,
-            isCustom: true
-        }))
+        ...customPhrases.map(cp => {
+            const parts = (cp.twi_translation || '').split('|');
+            const twiVal = parts[0] || '';
+            const gaVal = parts[1] || '';
+            return {
+                id: cp.id,
+                category: 'Custom',
+                text: cp.text,
+                twi: twiVal,
+                ga: gaVal,
+                icon: cp.icon,
+                color: cp.color,
+                image_url: cp.image_url,
+                isCustom: true
+            };
+        })
     ];
 
     // Filter phrases by active category
@@ -318,8 +337,12 @@ export default function PhraseboardScreen() {
                         const phrase = filteredPhrases[next];
                         
                         // Fire auditory TTS locator
-                        const textToSpeak = language === 'twi' ? (phrase.twi || phrase.text) : phrase.text;
-                        const langCode = language === 'twi' ? 'twi' : 'en';
+                        const textToSpeak = language === 'twi' 
+                            ? (phrase.twi || phrase.text) 
+                            : language === 'ga' 
+                                ? (phrase.ga || phrase.text) 
+                                : phrase.text;
+                        const langCode = language === 'twi' ? 'twi' : language === 'ga' ? 'ga' : 'en';
                         const speedMapping: any = { slow: 0.8, normal: 1.0, fast: 1.2 };
                         
                         TTSService.speak(textToSpeak, langCode as any, { 
@@ -624,7 +647,39 @@ export default function PhraseboardScreen() {
                             placeholderTextColor={colors.subText}
                             value={newPhraseTwi}
                             onChangeText={setNewPhraseTwi}
+                            selection={twiSelection}
+                            onSelectionChange={(e) => setTwiSelection(e.nativeEvent.selection)}
                         />
+                        <GhanaKeyboardHelper
+                            value={newPhraseTwi}
+                            onChangeText={setNewPhraseTwi}
+                            selection={twiSelection}
+                            onSelectionChange={setTwiSelection}
+                            colors={colors}
+                            label="Twi Assist:"
+                        />
+
+                        <Text style={{ fontSize: 14, fontWeight: '600', color: colors.text, marginBottom: 8, marginTop: 16 }}>
+                            Ga Translation (Optional)
+                        </Text>
+                        <TextInput
+                            style={[styles.input, { borderColor: colors.border, color: colors.text }]}
+                            placeholder="e.g. Tsɛ mi Mary"
+                            placeholderTextColor={colors.subText}
+                            value={newPhraseGa}
+                            onChangeText={setNewPhraseGa}
+                            selection={gaSelection}
+                            onSelectionChange={(e) => setGaSelection(e.nativeEvent.selection)}
+                        />
+                        <GhanaKeyboardHelper
+                            value={newPhraseGa}
+                            onChangeText={setNewPhraseGa}
+                            selection={gaSelection}
+                            onSelectionChange={setGaSelection}
+                            colors={colors}
+                            label="Ga Assist:"
+                        />
+
 
                         <View style={styles.modalButtons}>
                             <TouchableOpacity 
@@ -796,7 +851,7 @@ const styles = StyleSheet.create({
     phraseImage: {
         width: 90,
         height: 90,
-        borderRadius: 45,
+        borderRadius: 16,
         marginBottom: 10,
     },
     imagePickerBtn: {

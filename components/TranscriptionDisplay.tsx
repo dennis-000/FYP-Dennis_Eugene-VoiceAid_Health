@@ -12,6 +12,8 @@ import { useT } from '../utils/i18n';
 import AudioQualityIndicator from './AudioQualityIndicator';
 import ConfidenceMeter from './ConfidenceMeter';
 import LiveWaveform from './LiveWaveform';
+import GhanaKeyboardHelper from './GhanaKeyboardHelper';
+
 
 interface TranscriptionDisplayProps {
     recording: AudioRecorder | null;
@@ -41,6 +43,8 @@ export const TranscriptionDisplay: React.FC<TranscriptionDisplayProps> = ({
     const tr = useT(language as any);
     const [isEditing, setIsEditing] = useState(false);
     const [editedText, setEditedText] = useState('');
+    const [selection, setSelection] = useState({ start: 0, end: 0 });
+
 
     // Editing functions
     const handleEnableEdit = () => {
@@ -144,7 +148,21 @@ export const TranscriptionDisplay: React.FC<TranscriptionDisplayProps> = ({
                                         autoFocus
                                         placeholder={tr('editTranscriptionPlaceholder')}
                                         placeholderTextColor={colors.subText}
+                                        selection={selection}
+                                        onSelectionChange={(e) => setSelection(e.nativeEvent.selection)}
                                     />
+
+                                    {(language === 'twi' || language === 'ga') && (
+                                        <GhanaKeyboardHelper
+                                            value={editedText}
+                                            onChangeText={setEditedText}
+                                            selection={selection}
+                                            onSelectionChange={setSelection}
+                                            colors={colors}
+                                            label={language === 'twi' ? 'Twi Assist:' : 'Ga Assist:'}
+                                        />
+                                    )}
+
 
                                     {/* Action Buttons */}
                                     <View style={{ flexDirection: 'row', gap: 10, marginTop: 10 }}>

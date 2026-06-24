@@ -237,7 +237,7 @@ export default function JournalScreen() {
 
             if (!uri) throw new Error('No audio URI produced.');
 
-            const asrLang = language === 'twi' ? 'twi' : 'en';
+            const asrLang = language === 'twi' ? 'twi' : language === 'ga' ? 'ga' : 'en';
             const result = await ASRService.processAudio(uri, asrLang);
             
             const transcript = result.text;

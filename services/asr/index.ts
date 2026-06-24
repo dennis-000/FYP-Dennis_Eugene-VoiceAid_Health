@@ -93,7 +93,7 @@ export const ASRService = {
             // 2. Configure Language for Local Backend
             // Language hint if not auto-detect
             if (selectedLang !== 'auto') {
-                const langCode = selectedLang === 'twi' ? 'tw' : 'en';
+                const langCode = selectedLang === 'twi' ? 'tw' : selectedLang === 'ga' ? 'ga' : 'en';
                 formData.append('language', langCode);
             }
 
@@ -207,5 +207,6 @@ export const ASRService = {
      */
     transcribe: async (uri: string, selectedLang: string): Promise<ASRResponse> => {
         return ASRService.processAudio(uri, selectedLang as SupportedLanguage);
-    }
+    },
+    calculateConfidence: calculateConfidence
 };

@@ -258,7 +258,7 @@ export default function TherapyWordGameScreen() {
     const handleListen = async () => {
         haptics.selection();
         const textToSpeak = getTargetText();
-        const langCode = language === 'twi' ? 'twi' : 'en';
+        const langCode = language === 'twi' ? 'twi' : language === 'ga' ? 'ga' : 'en';
         try {
             await TTSService.speak(textToSpeak, langCode as any);
         } catch (e) {
@@ -350,7 +350,7 @@ export default function TherapyWordGameScreen() {
 
             if (!uri) throw new Error('No audio URI produced.');
 
-            const asrLang = language === 'twi' ? 'twi' : 'en';
+            const asrLang = language === 'twi' ? 'twi' : language === 'ga' ? 'ga' : 'en';
             
             // 100% robust offline fallback checks
             let transcript = '';

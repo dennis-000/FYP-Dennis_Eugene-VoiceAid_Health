@@ -52,7 +52,47 @@ import { AnalyticsService, SessionRecord } from '../services/analyticsService';
 import { AppContext } from './_layout';
 import { useT } from '../utils/i18n';
 import { supabase } from '../lib/supabase';
+import GhanaKeyboardHelper from '../components/GhanaKeyboardHelper';
+
 import { API_BASE_URL } from '../constants/config';
+
+const calculateStreak = (records: SessionRecord[]): number => {
+    if (!records || records.length === 0) return 0;
+    const uniqueDates = new Set(
+        records.map(r => {
+            try {
+                return r.date.split('T')[0];
+            } catch {
+                return '';
+            }
+        }).filter(Boolean)
+    );
+    const todayStr = new Date().toISOString().split('T')[0];
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayStr = yesterday.toISOString().split('T')[0];
+    if (!uniqueDates.has(todayStr) && !uniqueDates.has(yesterdayStr)) {
+        return 0;
+    }
+    let streak = 0;
+    const checkDate = uniqueDates.has(todayStr) ? new Date() : yesterday;
+    while (true) {
+        const dateStr = checkDate.toISOString().split('T')[0];
+        if (uniqueDates.has(dateStr)) {
+            streak++;
+            checkDate.setDate(checkDate.getDate() - 1);
+        } else {
+            break;
+        }
+    }
+    return streak;
+};
+
+const calculateXP = (records: SessionRecord[], completedGoalsCount: number): number => {
+    const totalWords = records.reduce((sum, s) => sum + (s.wordCount || 0), 0);
+    const sessionCount = records.length;
+    return (totalWords * 10) + (sessionCount * 50) + (completedGoalsCount * 100);
+};
 
 // --- SLP-Backed Suggested Assignments ---
 type SuggestedItem = {
@@ -105,6 +145,7 @@ export default function PatientDetailScreen() {
     const [activeMainTab, setActiveMainTab] = useState<'assignments' | 'journal' | 'analytics'>('assignments');
 
     const [goals, setGoals] = useState<PatientGoal[]>([]);
+    const [allTimeCompletedGoalsCount, setAllTimeCompletedGoalsCount] = useState(0);
     const [journals, setJournals] = useState<VoiceJournal[]>([]);
     const [analytics, setAnalytics] = useState<SessionRecord[]>([]);
     const [loading, setLoading] = useState(true);
@@ -112,6 +153,9 @@ export default function PatientDetailScreen() {
     const [showSuggestions, setShowSuggestions] = useState(false);
     const [newTitle, setNewTitle] = useState('');
     const [newDesc, setNewDesc] = useState('');
+    const [titleSelection, setTitleSelection] = useState({ start: 0, end: 0 });
+    const [descSelection, setDescSelection] = useState({ start: 0, end: 0 });
+
     const [newCategory, setNewCategory] = useState<GoalCategory>('communication');
     const [requiresRecording, setRequiresRecording] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
@@ -318,6 +362,7 @@ export default function PatientDetailScreen() {
         loadAnalytics();
         loadMoodLogs();
         checkActiveEmergency();
+        loadAllTimeCompletedGoals();
 
         // Real-time subscription for Clinical Priority alerts
         const channel = supabase
@@ -369,6 +414,15 @@ export default function PatientDetailScreen() {
     const loadAnalytics = async () => {
         const data = await AnalyticsService.getPatientAnalytics(patientId);
         setAnalytics(data);
+    };
+
+    const loadAllTimeCompletedGoals = async () => {
+        try {
+            const allGoals = await GoalService.getPatientGoals(patientId);
+            setAllTimeCompletedGoalsCount(allGoals.filter(g => g.completed).length);
+        } catch (err) {
+            console.error('Error fetching all time goals:', err);
+        }
     };
 
     const loadMoodLogs = async () => {
@@ -439,6 +493,7 @@ export default function PatientDetailScreen() {
             setNewCategory('communication');
             setRequiresRecording(false);
             loadGoals();
+            loadAllTimeCompletedGoals();
         } else {
             Alert.alert(tr('error'), tr('error'));
         }
@@ -455,6 +510,7 @@ export default function PatientDetailScreen() {
         );
         if (result) {
             loadGoals();
+            loadAllTimeCompletedGoals();
         }
     };
 
@@ -467,6 +523,7 @@ export default function PatientDetailScreen() {
                 onPress: async () => {
                     await GoalService.deleteGoal(goalId);
                     loadGoals();
+                    loadAllTimeCompletedGoals();
                 },
             },
         ]);
@@ -493,7 +550,7 @@ export default function PatientDetailScreen() {
                             <View style={{ backgroundColor: '#fef3c7', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 12, borderWidth: 1, borderColor: '#f59e0b50', flexDirection: 'row', alignItems: 'center', gap: 3 }}>
                                 <Ionicons name="trophy" size={11} color="#f59e0b" />
                                 <Text style={{ fontSize: 11, fontWeight: '700', color: '#b45309' }}>
-                                    {goals.filter(g => g.completed).length} Quests Completed
+                                    {allTimeCompletedGoalsCount} Quests Completed
                                 </Text>
                             </View>
                         </View>
@@ -655,7 +712,7 @@ export default function PatientDetailScreen() {
                                         <Text style={{
                                             fontSize: 12,
                                             fontWeight: '600',
-                                            color: isSelected ? '#fff' : isT ? colors.primary : colors.subText,
+                                            color: isSelected ? (colors.bg === '#111111' ? '#111111' : '#fff') : (isT ? colors.primary : colors.subText),
                                         }}>
                                             {formatDateLabel(date)}
                                         </Text>
@@ -1092,14 +1149,14 @@ export default function PatientDetailScreen() {
                                 <View style={{ alignItems: 'center' }}>
                                     <Ionicons name="flash" size={24} color="#f59e0b" />
                                     <Text style={{ fontSize: 18, fontWeight: 'bold', color: colors.text, marginTop: 4 }}>
-                                        {analytics.length > 0 ? (analytics[0].metadata?.streak || 3) : 0} Days
+                                        {calculateStreak(analytics)} Days
                                     </Text>
                                     <Text style={{ fontSize: 11, color: colors.subText }}>Daily Streak</Text>
                                 </View>
                                 <View style={{ alignItems: 'center' }}>
                                     <Ionicons name="sparkles" size={24} color="#a855f7" />
                                     <Text style={{ fontSize: 18, fontWeight: 'bold', color: colors.text, marginTop: 4 }}>
-                                        {analytics.length > 0 ? (analytics[0].metadata?.totalXp || 350) : 0} XP
+                                        {calculateXP(analytics, allTimeCompletedGoalsCount)} XP
                                     </Text>
                                     <Text style={{ fontSize: 11, color: colors.subText }}>Synced Experience</Text>
                                 </View>
@@ -1295,6 +1352,16 @@ export default function PatientDetailScreen() {
                             placeholderTextColor={colors.subText}
                             value={newTitle}
                             onChangeText={setNewTitle}
+                            selection={titleSelection}
+                            onSelectionChange={(e) => setTitleSelection(e.nativeEvent.selection)}
+                        />
+                        <GhanaKeyboardHelper
+                            value={newTitle}
+                            onChangeText={setNewTitle}
+                            selection={titleSelection}
+                            onSelectionChange={setTitleSelection}
+                            colors={colors}
+                            label="Twi/Ga Keys:"
                         />
 
                         <Text style={[styles.fieldLabel, { color: colors.text }]}>{tr('assignmentInstructionsLabel')}</Text>
@@ -1305,7 +1372,18 @@ export default function PatientDetailScreen() {
                             multiline
                             value={newDesc}
                             onChangeText={setNewDesc}
+                            selection={descSelection}
+                            onSelectionChange={(e) => setDescSelection(e.nativeEvent.selection)}
                         />
+                        <GhanaKeyboardHelper
+                            value={newDesc}
+                            onChangeText={setNewDesc}
+                            selection={descSelection}
+                            onSelectionChange={setDescSelection}
+                            colors={colors}
+                            label="Twi/Ga Keys:"
+                        />
+
 
                         {/* Requires Recording toggle */}
                         <TouchableOpacity

@@ -14,5 +14,7 @@ firebase-service-account.json
 .env*.local
 backend-env/
 __pycache__/
-*.pyc
+
+# Scratch / debug scripts (may contain credentials)
+scratch/
 

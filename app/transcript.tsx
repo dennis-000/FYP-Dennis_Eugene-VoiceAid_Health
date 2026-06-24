@@ -66,6 +66,8 @@ interface Message {
   timestamp: string;
 }
 
+let hasPlayedWelcomeGlobal = false;
+
 export default function TranscriptionScreen() {
   const router = useRouter();
   const { colors, language, reduceMotion: hapticEnabled } = useContext(AppContext);
@@ -284,9 +286,9 @@ export default function TranscriptionScreen() {
 
   // Play welcome message on mount
   useEffect(() => {
-    if (!hasPlayedWelcome) {
+    if (!hasPlayedWelcomeGlobal) {
       playWelcomeMessage();
-      setHasPlayedWelcome(true);
+      hasPlayedWelcomeGlobal = true;
     }
   }, []);
 
@@ -486,10 +488,14 @@ export default function TranscriptionScreen() {
           if (result.predicted_text) {
               setLivePredictedTranscript(prev => prev + ' ' + result.predicted_text);
           }
+          const calculatedConfidence = ASRService.calculateConfidence(
+            { ...result, meteringLevels: meteringLevels },
+            result.text
+          );
           setAsrMetadata({
-            confidence: result.confidence ?? 0.85,
+            confidence: calculatedConfidence,
             language: result.language || (language as string),
-            hasNoise: result.confidence ? result.confidence < 0.5 : false,
+            hasNoise: calculatedConfidence < 0.5,
             isOffline: !isOnline,
           });
           setTimeout(() => {
@@ -786,7 +792,7 @@ export default function TranscriptionScreen() {
                 backgroundColor: asrMetadata.confidence < 0.5 ? '#ef4444' : asrMetadata.confidence < 0.8 ? '#f59e0b' : '#22c55e'
               }} />
               <Text style={{ fontSize: 13, fontWeight: '900', color: colors.text, letterSpacing: 0.5 }}>
-                ASR CONFIDENCE GAUGE
+                SPEECH CLARITY METER
               </Text>
             </View>
             <View style={{ backgroundColor: colors.border + '40', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 }}>
@@ -808,10 +814,10 @@ export default function TranscriptionScreen() {
 
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
             <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.subText }}>
-              Confidence: {Math.round(asrMetadata.confidence * 100)}%
+              Speech Clarity: {Math.round(asrMetadata.confidence * 100)}%
             </Text>
             <Text style={{ fontSize: 11, fontWeight: '900', color: asrMetadata.confidence < 0.5 ? '#ef4444' : asrMetadata.confidence < 0.8 ? '#d97706' : '#16a34a' }}>
-              {asrMetadata.confidence < 0.5 ? 'Poor Signal / Slurred' : asrMetadata.confidence < 0.8 ? 'Fair Quality' : 'Excellent Clarity'}
+              {asrMetadata.confidence < 0.5 ? 'Hard to understand' : asrMetadata.confidence < 0.8 ? 'Clear voice' : 'Very clear!'}
             </Text>
           </View>
 

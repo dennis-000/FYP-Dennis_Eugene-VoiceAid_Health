@@ -16,6 +16,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { TTSService } from '../services/tts';
 import { AppContext } from './_layout';
 import { useT } from '../utils/i18n';
+import GhanaKeyboardHelper from '../components/GhanaKeyboardHelper';
+
 
 const STORAGE_KEY = '@voiceaid_guest_phrases';
 
@@ -37,6 +39,8 @@ export default function PhraseBuilderScreen() {
     const [phrases, setPhrases] = useState<GuestPhrase[]>([]);
     const [showModal, setShowModal] = useState(false);
     const [newText, setNewText] = useState('');
+    const [selection, setSelection] = useState({ start: 0, end: 0 });
+
     const [newEmoji, setNewEmoji] = useState('💬');
     const [newColor, setNewColor] = useState('#3b82f6');
     const [speakingId, setSpeakingId] = useState<string | null>(null);
@@ -179,7 +183,21 @@ export default function PhraseBuilderScreen() {
                             onChangeText={setNewText}
                             multiline
                             numberOfLines={3}
+                            selection={selection}
+                            onSelectionChange={(e) => setSelection(e.nativeEvent.selection)}
                         />
+
+                        {(language === 'twi' || language === 'ga') && (
+                            <GhanaKeyboardHelper
+                                value={newText}
+                                onChangeText={setNewText}
+                                selection={selection}
+                                onSelectionChange={setSelection}
+                                colors={colors}
+                                label={language === 'twi' ? 'Twi Assist:' : 'Ga Assist:'}
+                            />
+                        )}
+
 
                         {/* Emoji Picker */}
                         <Text style={[styles.pickerLabel, { color: colors.text }]}>

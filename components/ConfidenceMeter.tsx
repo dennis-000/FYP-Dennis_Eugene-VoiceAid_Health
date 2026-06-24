@@ -14,15 +14,15 @@ export default function ConfidenceMeter({ score, hasNoise, languageConfidence }:
 
   // Determine color based on score
   let color = THEMES.light.success; // Green (> 80%)
-  let label = "High Accuracy";
+  let label = "🌟 Very Clear Speech!";
 
   if (score < 0.8) {
     color = '#F59E0B'; // Amber
-    label = "Medium Accuracy";
+    label = "👍 Mostly Clear (Good Effort!)";
   }
   if (score < 0.5) {
     color = THEMES.light.danger; // Red
-    label = "Low Confidence - Please repeat";
+    label = "🔄 Unclear - Please speak louder/clearer";
   }
 
   const percentage = Math.round(score * 100);
@@ -60,6 +60,10 @@ export default function ConfidenceMeter({ score, hasNoise, languageConfidence }:
           ]}
         />
       </View>
+
+      <Text style={{ fontSize: 11, color: '#64748B', marginTop: 6, fontWeight: '500' }}>
+        This shows how clearly you spoke. Try to speak slowly and get the score high!
+      </Text>
 
       {/* Additional Info */}
       <View style={styles.infoRow}>
